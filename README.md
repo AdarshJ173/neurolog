@@ -59,14 +59,14 @@ Validated the Early Warning System (EWS) by creating "Death Spiral" scenarios to
 To minimize latency, we bypassed traditional transformation layers and went with a Direct-to-Vector pipeline. Our frontend components (like Traffic_Bot.js) pull raw telemetry directly, while our backend handles the mathematical lifting.
 
 **The Shift to Real-Time Observability.**
-_**The Legacy Pipeline (What we moved away from)**_
+_**The Legacy Pipeline(What we moved away from)**_:-
 1. _The Manual Process_: Required starting a server.js and a traffic_board.js to fake logs.
 
 2. _The Bottleneck_: Data had to be written to a physical app.log.txt file, then passed through a Transformation Engine (te.py) before reaching the database.
 
 3. _The Problem_: File I/O (reading/writing to text files) is slow and doesn't scale for real-world servers.
 
-_**The Updated "NeuroLog" Pipeline (The Current Pro Version)**_
+_**The Updated "NeuroLog" Pipeline (The Current Pro Version)**_:-
 1. _API-First Ingestion_: We removed the need for manual traffic generators and text files. Instead, NeuroLog now provides a Standardized API Endpoint.
 
 2. _Plug-and-Play Integration_: Any external application can now "hook" into our backend. No need to start a separate gateway; the main server handles the stream.
