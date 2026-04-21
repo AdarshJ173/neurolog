@@ -14,7 +14,7 @@ app = Flask(__name__)
 CORS(app)
 
 # MongoDB Setup
-client = MongoClient('mongodb://localhost:27017/')
+client = MongoClient('YOUR-MONGO-CLIENT-LOCALHOST-SERVER')
 db = client['neurolog_db']
 logs_collection = db['logs']
 users_collection = db['users'] 
@@ -22,7 +22,7 @@ users_collection = db['users']
 # ==========================================
 # GROQ API KEY
 # ==========================================
-groq_client = Groq(api_key="REMOVED_EXPOSED_GROQ_KEY")
+groq_client = Groq(api_key="YOUR_GROQ_API_KEY")
 
 # ==========================================
 # 1. API KEY MANAGEMENT (Upgraded for Multiple Apps)
