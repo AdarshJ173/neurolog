@@ -67,12 +67,14 @@ _**The Legacy Pipeline(What we moved away from)**_:-
 
 3. _The Problem_: File I/O (reading/writing to text files) is slow and doesn't scale for real-world servers.
 
-_**The Updated "NeuroLog" Pipeline (The Current Pro Version)**_:-
-1. _API-First Ingestion_: We removed the need for manual traffic generators and text files. Instead, NeuroLog now provides a Standardized API Endpoint.
+_**⚡ Modernized Data Flow(The Updated NeuroLog Pipeline)**_
+Our updated architecture moves away from file-based batch processing to a Live Streaming API Pipeline.
 
-2. _Plug-and-Play Integration_: Any external application can now "hook" into our backend. No need to start a separate gateway; the main server handles the stream.
+1. Zero-Configuration Ingestion: External applications connect via our unified API endpoint. This eliminates the legacy server.js gateway and physical app.log.txt dependencies.
 
-3. _Direct-to-Intelligence_: Logs move from the source directly into our XGBoost classification engine and MongoDB. We eliminated the te.py middleman to achieve sub-second latency.
+2. Unified Backend: The Flask core now handles ingestion, ML-processing, and LLM-advisory tasks simultaneously, reducing data hopping and latency.
+
+3. Dynamic Sourcing: By decoupling the log generator, NeuroLog can now monitor multiple distributed environments at once, aggregating data into a single MongoDB time-series store.
 
 
 🛠️ Step-by-Step Technical Setup
