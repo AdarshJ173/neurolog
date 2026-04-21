@@ -58,7 +58,8 @@ Validated the Early Warning System (EWS) by creating "Death Spiral" scenarios to
 
 To minimize latency, we bypassed traditional transformation layers and went with a Direct-to-Vector pipeline. Our frontend components (like Traffic_Bot.js) pull raw telemetry directly, while our backend handles the mathematical lifting.
 
-**The Shift to Real-Time Observability.**
+**The Shift to Real-Time Observability:-**
+
 _**The Legacy Pipeline(What we moved away from)**_:-
 1. _The Manual Process_: Required starting a server.js and a traffic_board.js to fake logs.
 
