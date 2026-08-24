@@ -1,7 +1,0 @@
-{
-  "eps": 0.5,
-  "min_samples": 3,
-  "rules": [
-    {"keyword": "timeout", "severity": "Warning", "action": "Alert Admin"}
-  ]
-}
