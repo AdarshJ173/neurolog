@@ -2,12 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from '../api';
 import { PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, Legend, XAxis, YAxis } from 'recharts';
 import { Activity, ShieldAlert, BrainCircuit, AlertTriangle, CheckCircle } from 'lucide-react';
-import { auth } from '../firebase';
 
 const NeuroLogDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const user = auth?.currentUser;
   const notified = useRef(new Set());
 
   const [systemState, setSystemState] = useState('stable'); // stable, imminent, crashed, recovered
@@ -15,7 +13,6 @@ const NeuroLogDashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
       try {
         const res = await axios.get(`/recent-logs`);
         const logs = res.data;
@@ -47,7 +44,7 @@ const NeuroLogDashboard = () => {
     fetchData();
     const uiInterval = setInterval(fetchData, 2000);
     return () => clearInterval(uiInterval);
-  }, [user]);
+  }, []);
 
   if (!loading && !data) return <p role="alert">Cannot load logs. Start the backend; this page retries every two seconds.</p>;
 

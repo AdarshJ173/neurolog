@@ -1,71 +1,42 @@
-# NeuroLog AI
+# NeuroLog AI demo
 
-A local log observability application with React, Flask, SQLite, TF-IDF/DBSCAN clustering, and optional Firebase authentication and Groq advisory responses.
+A presentation-ready local demo with no login, account setup, or API-key configuration in the interface.
 
-## Preview
+## Start the demo
 
-![Local demo](docs/preview.png)
-
-## Run on Windows
-
-Requires Python 3.12 and Node.js 22.12+.
+Requires Node.js 22.12+ and Python 3.12. From the project root on Windows:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-lock.txt
-cd logintel_ui
-npm ci
-cd ..
+powershell -ExecutionPolicy Bypass -File .\start-preview.ps1
+```
+
+The launcher installs missing dependencies, starts Flask and Vite as hidden background processes, checks the API, and loads sample records if the database is empty. Both services stay running after the launcher exits.
+
+Open **http://127.0.0.1:5173/dashboard**. Click **Run clustering**, then explore Vector Analysis, Log Explorer, and AI Assistant. Demo Settings contains only appearance and sample-data controls.
+
+To run the services in visible terminals instead:
+
+```powershell
+$env:NEUROLOG_DEMO='true'
 .\.venv\Scripts\python.exe LogIntel_engine\api.py
 ```
 
-In another terminal:
+In another terminal, run `npm run dev` inside `logintel_ui`. Keep those terminals open.
 
-```powershell
-cd logintel_ui
-npm run dev
-```
+## Guide and preview
 
-Open http://127.0.0.1:5173. Click **Load sample logs**, then **Run clustering**. Demo mode needs no external accounts and persists data in `data/neurolog.db`. Keep the demo local; real accounts require both demo flags disabled and your own Firebase configuration.
+- [Demo guide](docs/USER_GUIDE.md)
+- [Printable PDF](output/pdf/NeuroLog_User_Guide.pdf)
+- [Repair notes](docs/REPAIR_NOTES.md)
 
-A convenience launcher is also available: `powershell -ExecutionPolicy Bypass -File .\start.ps1`.
+![Demo preview](docs/preview.png)
 
-## Learn and configure
+The frontend has no Firebase dependency or authentication routes. The demo runs locally with React, Flask, SQLite, and TF-IDF/DBSCAN. The assistant uses a labeled deterministic local response when no Groq key is configured. It does not execute remediation. The health score is a recent-log heuristic; outliers are review candidates rather than proof of failure.
 
-- [User guide](docs/USER_GUIDE.md): setup, workflow, ingestion examples, architecture, Firebase/Groq configuration, and troubleshooting.
-- [PDF guide](output/pdf/NeuroLog_User_Guide.pdf): printable version of the guide.
-- [Repair and validation notes](docs/REPAIR_NOTES.md).
+## Check the code
 
-Copy root `.env.example` to `.env` for backend configuration, and `logintel_ui/.env.example` to `.env.local` inside `logintel_ui` for frontend configuration. Secrets and runtime databases are ignored by Git.
-
-## What is implemented
-
-- API-key ingestion with validation and UTC timestamps.
-- Workspace ownership verified through Firebase tokens in authenticated mode.
-- Durable SQLite storage, retention settings, and scoped log purging.
-- Live Monitor, Log Explorer search/severity filters, and Vector Analysis.
-- On-demand TF-IDF and DBSCAN clustering of the latest 100 messages.
-- Local demo advisor, or live Groq responses when configured.
-- Appearance settings and optional desktop alerts for newly observed critical logs.
-- Optional Node compatibility gateway and log simulator.
-
-The health score is a heuristic over recent critical logs. Text outliers are review candidates, not proof of faults. Incident cards reflect supplied log markers. This code does not include XGBoost, HDBSCAN, a validated 94% accuracy result, or automatic remediation. Slack/email integrations and alternate assistant styles are disabled rather than presented as working controls.
-
-## Verification
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-cd logintel_ui
-npm run lint
-npm run build
-npm audit
-cd ..\server
-npm run check
-npm audit
-```
-
-GitHub Actions repeats backend tests, frontend lint/build, gateway syntax checks, and npm audits.
+Run `.\.venv\Scripts\python.exe -m pytest -q` from the root. In `logintel_ui`, run `npm run lint` and `npm run build`. GitHub Actions also checks the optional gateway.
 
 ## Attribution
 
-Based on [Sai-Nitin123/Neurolog-AI](https://github.com/Sai-Nitin123/Neurolog-AI). Original contributors: Sai Nitin, Dhruv Patel, and Manoj Kolapalli. The original [MIT license](LICENSE) is retained. The legacy MongoDB/file-courier examples are separate from the supported SQLite dashboard pipeline.
+Based on [Sai-Nitin123/Neurolog-AI](https://github.com/Sai-Nitin123/Neurolog-AI), with the original MIT license retained. Original contributors: Sai Nitin, Dhruv Patel, and Manoj Kolapalli.

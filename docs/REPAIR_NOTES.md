@@ -35,3 +35,9 @@ No live Firebase/Groq credentials were supplied, so real sign-in and LLM provide
 ## GitHub history
 
 The existing user repository's latest main commit removed the source files. This repair is published on a review branch that restores the project while retaining upstream attribution and existing repository history. No force push is used.
+
+## Demo-only follow-up
+
+Removed the frontend Login page, Firebase module and dependency, auth listener/token injection, sign-out, account/integration/key controls, and unsupported settings. The frontend opens directly to the dashboard, with a simplified Demo Settings screen. The backend's optional authenticated API remains available as legacy functionality, but the presentation launcher forces local demo mode.
+
+The previous preview services had stopped. Added start-preview.ps1 to launch hidden background services with readiness checks, log output, and initial sample data. The launcher successfully exited while the browser continued to load data and clustering. The demo-only frontend passed lint and production build.

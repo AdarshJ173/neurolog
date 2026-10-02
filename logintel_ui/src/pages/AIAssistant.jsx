@@ -1,14 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from '../api';
 import { Bot, Send, ShieldAlert, Trash2 } from 'lucide-react';
-import { auth } from '../firebase';
 import ReactMarkdown from 'react-markdown';
 
 
 const AIAssistant = () => {
   // 🚨 NEW: Load initial state from localStorage!
   const [messages, setMessages] = useState(() => {
-    const saved = sessionStorage.getItem(`neurolog-chat-${auth?.currentUser?.uid}`);
+    const saved = sessionStorage.getItem('neurolog-demo-chat');
     try { if (saved && Array.isArray(JSON.parse(saved))) return JSON.parse(saved); } catch { /* Ignore corrupt stored history. */ }
     return [{ sender: 'bot', text: 'NeuroLog AI initialized. Monitoring server streams for malicious activity and critical anomalies.' }];
   });
@@ -21,14 +20,13 @@ const AIAssistant = () => {
   const notifiedIdsRef = useRef(new Set());
 
   const chatBoxRef = useRef(null);
-  const user = auth?.currentUser;
 
 
   // 🚨 NEW: Save chat history to localStorage every time it changes
   useEffect(() => {
-    sessionStorage.setItem(`neurolog-chat-${user.uid}`, JSON.stringify(messages.slice(-100)));
+    sessionStorage.setItem('neurolog-demo-chat', JSON.stringify(messages.slice(-100)));
     if (chatBoxRef.current) chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
-  }, [messages, isTyping, user.uid]);
+  }, [messages, isTyping]);
 
   const clearHistory = () => {
     setMessages([{ sender: 'bot', text: 'Chat history cleared. NeuroLog AI monitoring active.' }]);
@@ -37,7 +35,6 @@ const AIAssistant = () => {
 
   useEffect(() => {
     const fetchLogs = async () => {
-      if (!user) return;
       try {
         const res = await axios.get(`/recent-logs`);
         const threats = res.data.filter(log => log.severity_level <= 3).slice(0, 10);
@@ -69,18 +66,18 @@ const AIAssistant = () => {
     fetchLogs();
     const interval = setInterval(fetchLogs, 3000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, []);
 
   const handleSend = async (customText = null) => {
     const textToSend = customText || input;
-    if (!textToSend.trim() || !user || isTyping) return;
+    if (!textToSend.trim() || isTyping) return;
 
     setMessages(prev => [...prev, { sender: 'user', text: textToSend }]);
     if (!customText) setInput('');
     setIsTyping(true);
 
     try {
-      const res = await axios.post('/chat', { message: textToSend, uid: user.uid });
+      const res = await axios.post('/chat', { message: textToSend });
       let botReply = res.data.reply;
       botReply = botReply.replace(/\[THEME_[A-Z]+\]/g, '').trim();
       setMessages(prev => [...prev, { sender: 'bot', text: botReply }]);

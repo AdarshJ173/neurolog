@@ -1,19 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../api';
 import { Search, Filter, AlertTriangle, ShieldAlert, Info } from 'lucide-react';
-import { auth } from '../firebase';
 
 const LogExplorer = () => {
   const [logs, setLogs] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [severity, setSeverity] = useState('all');
   const [loading, setLoading] = useState(true);
-  const user = auth?.currentUser;
 
   // Fetch the live logs from MongoDB
   useEffect(() => {
     const fetchLogs = async () => {
-      if (!user) return;
       try {
         // Fetch a larger chunk for the explorer (e.g., limit 50 or 100 in your backend if you updated it)
         const res = await axios.get(`/recent-logs`);
@@ -29,7 +26,7 @@ const LogExplorer = () => {
     // Refresh every 5 seconds to keep the explorer updated
     const interval = setInterval(fetchLogs, 5000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, []);
 
   // Filter logs based on search bar
   const filteredLogs = logs.filter(log =>
