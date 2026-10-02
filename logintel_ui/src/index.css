@@ -2,7 +2,7 @@
 :root {
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  
+
   /* Genuine "iOS" Frost Glass Variables */
   --glass-bg: rgba(255, 255, 255, 0.02); /* Almost entirely transparent */
   --glass-border: rgba(255, 255, 255, 0.05);
@@ -13,7 +13,7 @@
 [data-theme='light'] {
   --text-main: #0f172a;
   --text-muted: #475569;
-  
+
   --glass-bg: rgba(255, 255, 255, 0.4);
   --glass-border: rgba(255, 255, 255, 0.4);
   --glass-border-light: rgba(255, 255, 255, 0.8);
@@ -27,7 +27,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: var(--text-main);
   background-color: #020617; /* Deep base */
-  background-image: 
+  background-image:
     radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.3) 0px, transparent 50%),    /* Top Left Blue */
     radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.25) 0px, transparent 50%), /* Top Right Purple */
     radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.15) 0px, transparent 50%); /* Bottom Right Green */
@@ -39,7 +39,7 @@ body {
 
 [data-theme='light'] body {
   background-color: #f8fafc;
-  background-image: 
+  background-image:
     radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.2) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
     radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
@@ -55,16 +55,16 @@ body {
   background: var(--glass-bg);
   backdrop-filter: blur(40px) saturate(200%); /* High blur, high color saturation */
   -webkit-backdrop-filter: blur(40px) saturate(200%);
-  
+
   /* 3D Border Effect */
   border: 1px solid var(--glass-border);
   border-top: 1px solid var(--glass-border-light);
   border-left: 1px solid var(--glass-border-light);
-  
+
   box-shadow: var(--glass-shadow);
   border-radius: 24px; /* Softer, Apple-style rounded corners */
-  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
-              box-shadow 0.4s ease, 
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+              box-shadow 0.4s ease,
               background 0.4s ease;
 }
 
@@ -94,7 +94,7 @@ body {
 :root {
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  
+
   /* Dynamic Mesh Background Variables */
   --bg-base: #020617;
   --bg-mesh: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.3) 0px, transparent 50%),
@@ -111,7 +111,7 @@ body {
 [data-theme='light'] {
   --text-main: #0f172a;
   --text-muted: #475569;
-  
+
   --bg-base: #f8fafc;
   --bg-mesh: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.2) 0px, transparent 50%),
              radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
@@ -133,7 +133,42 @@ body {
   background-attachment: fixed;
   background-size: 150% 150%;
   animation: breathe 10s ease-in-out infinite alternate;
-  overflow-x: hidden; 
+  overflow-x: hidden;
   overflow-y: auto;
   transition: background-color 0.5s ease;
+}
+*, *::before, *::after { box-sizing: border-box; }
+:root { --bg-sidebar: var(--glass-bg); }
+button, select, input { font: inherit; }
+button, select { min-height: 40px; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #60a5fa !important; outline-offset: 3px; }
+select { background: var(--glass-bg); color: var(--text-main); border: 1px solid var(--glass-border); border-radius: 8px; padding: 8px; }
+select option { background: #152039; color: #f8fafc; }
+.demo-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 16px; margin-bottom: 24px; }
+.demo-toolbar span { flex: 1; }
+.demo-toolbar button, .status-message button { border: 1px solid var(--glass-border); border-radius: 8px; padding: 8px 12px; background: #2563eb; color: white; cursor: pointer; }
+.status-message { padding: 16px; border: 1px solid #f59e0b; border-radius: 12px; margin-bottom: 20px; }
+.sidebar.glass-panel:hover, .demo-toolbar:hover, .glass-panel:hover { transform: none; background: var(--glass-bg); }
+.log-row { overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+ .main-content { padding: 24px !important; }
+ .assistant-layout { grid-template-columns: 1fr !important; height: auto !important; }
+ .assistant-layout > div { min-height: 500px !important; }
+ .dashboard-charts { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 700px) {
+ .sidebar { width: 64px !important; padding: 18px 6px !important; }
+ .sidebar h2, .sidebar nav span, .sidebar .collapse-label { display: none !important; }
+ .sidebar nav a { padding: 10px !important; justify-content: center !important; min-width: 0 !important; }
+ .sidebar .brand-container { padding-left: 8px !important; gap: 0 !important; }
+ .main-content { margin-left: 64px !important; padding: 16px !important; }
+ h1 { font-size: 1.6rem; }
+ header { flex-wrap: wrap; gap: 12px; }
+ .log-row { grid-template-columns: 85px 1fr !important; gap: 8px; }
+ .log-row > :last-child { grid-column: 1 / -1; }
+ input { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+ *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }

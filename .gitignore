@@ -4,3 +4,14 @@ node_modules/
 __pycache__/
 *.dll
 *.exe
+.env
+.env.local
+.env.*.local
+data/
+dist/
+.pytest_cache/
+server/logs/
+docs/rendered/
+*.log
+source/
+tmp/

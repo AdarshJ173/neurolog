@@ -1,38 +1,32 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useEffect, useState, useRef } from 'react';
+import axios from '../api';
+import { PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, Legend, XAxis, YAxis } from 'recharts';
 import { Activity, ShieldAlert, BrainCircuit, AlertTriangle, CheckCircle } from 'lucide-react';
-import { auth } from '../firebase'; 
+import { auth } from '../firebase';
 
 const NeuroLogDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const user = auth.currentUser; 
+  const user = auth?.currentUser;
+  const notified = useRef(new Set());
 
   const [systemState, setSystemState] = useState('stable'); // stable, imminent, crashed, recovered
-  const [countdown, setCountdown] = useState(0);
+
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return; 
+      if (!user) return;
       try {
-        const res = await axios.get(`http://127.0.0.1:5001/api/recent-logs?uid=${user.uid}`);
+        const res = await axios.get(`/recent-logs`);
         const logs = res.data;
-
-        if (logs.length > 0) {
-          const latestLog = logs[0];
-          
-          if (latestLog.message.includes("[ANOMALY PATTERN 8]") && systemState === 'stable') {
-            setSystemState('imminent');
-            setCountdown(15);
-          } 
-          else if (latestLog.message.includes("[SYSTEM HOTFIX]") && systemState === 'imminent') {
-            setSystemState('recovered');
-            setCountdown(0);
-            setTimeout(() => setSystemState('stable'), 5000); 
-          }
+        if ('Notification' in window && Notification.permission === 'granted' && localStorage.getItem('aegis_notifications') === 'true') {
+          const critical = logs.find(log => log.severity_level <= 2 && !notified.current.has(log._id));
+          if (critical) new Notification('NeuroLog critical log', {body: `${critical.source}: ${critical.message}`});
         }
+        logs.forEach(log => notified.current.add(log._id));
 
+        const incident = logs.find(log => /\[ANOMALY PATTERN 8\]|\[SYSTEM HOTFIX\]|MongoTimeoutError/.test(log.message));
+        setSystemState(!incident ? 'stable' : incident.message.includes('[SYSTEM HOTFIX]') ? 'recovered' : incident.message.includes('MongoTimeoutError') ? 'crashed' : 'imminent');
         const criticalCount = logs.filter(log => log.severity_level <= 2).length;
         const calculatedHealth = Math.max(0, 100 - (criticalCount * 12));
         const severityCounts = {};
@@ -43,30 +37,19 @@ const NeuroLogDashboard = () => {
 
         const colorMap = { "CRITICAL": "#ef4444", "WARNING": "#f59e0b", "INFO": "#10b981", "DEBUG": "#8b5cf6" };
         const pieData = Object.keys(severityCounts).map(key => ({ name: key, value: severityCounts[key], fill: colorMap[key] || "#3b82f6" }));
-        const areaData = [...logs].reverse().map((log) => ({ time: new Date(log.timestamp).toLocaleTimeString(), volume: (6 - log.severity_level) * 15, source: log.source }));
+        const areaData = [...logs].reverse().map((log) => ({ time: new Date(log.timestamp).toLocaleTimeString(), severity: log.severity_level, source: log.source }));
 
         setData({ current_health: calculatedHealth, critical_threats: criticalCount, severity_distribution: pieData, traffic_history: areaData });
         setLoading(false);
-      } catch (err) { console.error("Dashboard Offline"); }
+      } catch { setLoading(false); }
     };
 
     fetchData();
     const uiInterval = setInterval(fetchData, 2000);
     return () => clearInterval(uiInterval);
-  }, [user, systemState]);
+  }, [user]);
 
-  useEffect(() => {
-    let timer;
-    if (systemState === 'imminent' && countdown > 0) {
-      timer = setTimeout(() => setCountdown(c => c - 1), 1000);
-    } else if (systemState === 'imminent' && countdown === 0) {
-      setSystemState('crashed');
-      if (localStorage.getItem('aegis_notifications') === 'true' && Notification.permission === 'granted') {
-          new Notification("🚨 Aegis Critical Alert", { body: "SYSTEM OFFLINE: Cascading failure resulted in database crash." });
-      }
-    }
-    return () => clearTimeout(timer);
-  }, [countdown, systemState]);
+  if (!loading && !data) return <p role="alert">Cannot load logs. Start the backend; this page retries every two seconds.</p>;
 
   if (loading || !data) return (
     <div className="animate-in" style={{height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)'}}>
@@ -90,16 +73,16 @@ const NeuroLogDashboard = () => {
       <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ margin: 0 }}>System Intelligence</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Real-time Anomaly Detection & Predictive Health</p>
+          <p style={{ color: 'var(--text-muted)' }}>Real-time Anomaly Detection & Severity Summary</p>
         </div>
         <div className="glass-panel" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', color: data.current_health < 60 ? '#ef4444' : '#10b981', border: `1px solid ${data.current_health < 60 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}` }}>
-          <span style={{ background: data.current_health < 60 ? '#ef4444' : '#10b981', width: '8px', height: '8px', borderRadius: '50%', animation: 'pulseGlow 2s infinite' }}></span> LIVE STREAM
+          <span style={{ background: data.current_health < 60 ? '#ef4444' : '#10b981', width: '8px', height: '8px', borderRadius: '50%', animation: 'pulseGlow 2s infinite' }}></span> POLLING LOGS
         </div>
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         <div className="glass-panel" style={{ padding: '1.5rem', borderLeft: `4px solid ${data.current_health < 60 ? "#ef4444" : "#10b981"}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}><h3 style={{ margin: 0, color: 'var(--text-muted)' }}>System Health</h3><Activity color={data.current_health < 60 ? "#ef4444" : "#10b981"} /></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}><h3 style={{ margin: 0, color: 'var(--text-muted)' }}>Recent-log Health Score</h3><Activity color={data.current_health < 60 ? "#ef4444" : "#10b981"} /></div>
           <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: data.current_health < 60 ? "#ef4444" : "#10b981" }}>{data.current_health}%</div>
         </div>
 
@@ -111,33 +94,33 @@ const NeuroLogDashboard = () => {
         <div className={`glass-panel ${systemState === 'imminent' ? 'card-alert' : systemState === 'recovered' ? 'card-recovered' : systemState === 'crashed' ? 'card-crashed' : ''}`} style={{ padding: '1.5rem', borderLeft: `4px solid ${systemState === 'stable' ? '#8b5cf6' : systemState === 'recovered' ? '#10b981' : '#ef4444'}`, transition: 'all 0.3s ease' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <h3 style={{ margin: 0, color: systemState === 'stable' ? 'var(--text-muted)' : systemState === 'recovered' ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>
-              {systemState === 'stable' ? 'Predictive Engine' : systemState === 'imminent' ? 'EWS ALERT' : systemState === 'recovered' ? 'SYSTEM SAVED' : 'SYSTEM CRASHED'}
+              {systemState === 'stable' ? 'Incident Markers' : systemState === 'imminent' ? 'EWS ALERT' : systemState === 'recovered' ? 'RECOVERY REPORTED' : 'FAILURE REPORTED'}
             </h3>
             {systemState === 'stable' && <BrainCircuit color="#8b5cf6" />}
             {systemState === 'imminent' && <AlertTriangle color="#ef4444" />}
             {systemState === 'recovered' && <CheckCircle color="#10b981" />}
             {systemState === 'crashed' && <AlertTriangle color="#ef4444" opacity={0.5} />}
           </div>
-          
+
           <div style={{ fontSize: systemState === 'imminent' ? '3rem' : '2.5rem', fontWeight: '900', color: systemState === 'stable' ? '#8b5cf6' : systemState === 'recovered' ? '#10b981' : '#ef4444', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
             {systemState === 'stable' && 'Stable'}
-            {systemState === 'imminent' && `00:${countdown < 10 ? '0'+countdown : countdown}`}
+            {systemState === 'imminent' && 'Warning'}
             {systemState === 'recovered' && 'HOTFIXED'}
             {systemState === 'crashed' && 'OFFLINE'}
           </div>
 
           <p style={{ color: systemState === 'stable' ? 'var(--text-muted)' : systemState === 'recovered' ? '#10b981' : '#ef4444', fontSize: '0.85rem', margin: '0.5rem 0 0 0', fontWeight: systemState === 'stable' ? 'normal' : 'bold' }}>
-            {systemState === 'stable' && 'AI Monitoring active.'}
-            {systemState === 'imminent' && 'Cascading failure predicted...'}
-            {systemState === 'recovered' && 'Memory leak patched. Crisis averted.'}
-            {systemState === 'crashed' && 'Connection severed.'}
+            {systemState === 'stable' && 'No incident markers observed.'}
+            {systemState === 'imminent' && 'Warning marker observed; investigate.'}
+            {systemState === 'recovered' && 'Recovery marker observed in logs.'}
+            {systemState === 'crashed' && 'Failure marker observed in logs.'}
           </p>
         </div>
       </div>
 
       {/* 🚨 THE FIX: Both charts are properly restored in the 1fr 2fr grid! 🚨 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
-        
+      <div className="dashboard-charts" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
+
         {/* LEFT CHART: Severity Distribution (Pie) */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
           <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Severity Distribution</h3>
@@ -147,6 +130,7 @@ const NeuroLogDashboard = () => {
             <div style={{ width: '100%', height: 250 }}>
                 <ResponsiveContainer>
                 <PieChart>
+                    <Legend />
                     <Pie data={data.severity_distribution} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
                     {data.severity_distribution.map((entry, index) => ( <Cell key={`cell-${index}`} fill={entry.fill} /> ))}
                     </Pie>
@@ -157,15 +141,17 @@ const NeuroLogDashboard = () => {
           )}
         </div>
 
-        {/* RIGHT CHART: Live Traffic Volume (Area) */}
+        {/* RIGHT CHART: Recent Log Severity (Area) */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Live Traffic Volume</h3>
+          <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Recent Log Severity</h3>
           <div style={{ width: '100%', height: 250 }}>
             <ResponsiveContainer>
               <AreaChart data={data.traffic_history}>
+                 <XAxis dataKey="time" hide />
+                 <YAxis domain={[0, 7]} allowDecimals={false} stroke="var(--text-muted)" width={25} />
                  <CartesianGrid strokeDasharray="3 3" stroke="var(--text-muted)" opacity={0.1} vertical={false} />
                  <Tooltip contentStyle={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-main)' }} />
-                 <Area type="monotone" dataKey="volume" stroke="#3b82f6" fillOpacity={0.2} fill="#3b82f6" strokeWidth={3} isAnimationActive={false} />
+                 <Area type="monotone" dataKey="severity" stroke="#3b82f6" fillOpacity={0.2} fill="#3b82f6" strokeWidth={3} isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

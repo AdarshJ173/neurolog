@@ -1,33 +1,34 @@
 import React, { useEffect, useState, useRef } from 'react';
-import axios from 'axios';
+import axios from '../api';
 import { Bot, Send, ShieldAlert, Trash2 } from 'lucide-react';
-import { auth } from '../firebase'; 
-import ReactMarkdown from 'react-markdown'; 
-import { useTheme } from '../context/ThemeContext'; 
+import { auth } from '../firebase';
+import ReactMarkdown from 'react-markdown';
+
 
 const AIAssistant = () => {
   // 🚨 NEW: Load initial state from localStorage!
   const [messages, setMessages] = useState(() => {
-    const saved = localStorage.getItem('aegis_chat_history');
-    return saved ? JSON.parse(saved) : [{ sender: 'bot', text: 'NeuroLog AI initialized. Monitoring server streams for malicious activity and critical anomalies.' }];
+    const saved = sessionStorage.getItem(`neurolog-chat-${auth?.currentUser?.uid}`);
+    try { if (saved && Array.isArray(JSON.parse(saved))) return JSON.parse(saved); } catch { /* Ignore corrupt stored history. */ }
+    return [{ sender: 'bot', text: 'NeuroLog AI initialized. Monitoring server streams for malicious activity and critical anomalies.' }];
   });
-  
+
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [criticalLogs, setCriticalLogs] = useState([]);
-  
+
   // 🚨 FIX: Use a ref Set to permanently track IDs we've already alerted about (No double posting!)
   const notifiedIdsRef = useRef(new Set());
-  
+
   const chatBoxRef = useRef(null);
-  const user = auth.currentUser; 
-  const { setBackground } = useTheme();
+  const user = auth?.currentUser;
+
 
   // 🚨 NEW: Save chat history to localStorage every time it changes
   useEffect(() => {
-    localStorage.setItem('aegis_chat_history', JSON.stringify(messages));
+    sessionStorage.setItem(`neurolog-chat-${user.uid}`, JSON.stringify(messages.slice(-100)));
     if (chatBoxRef.current) chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
-  }, [messages, isTyping]); 
+  }, [messages, isTyping, user.uid]);
 
   const clearHistory = () => {
     setMessages([{ sender: 'bot', text: 'Chat history cleared. NeuroLog AI monitoring active.' }]);
@@ -36,28 +37,28 @@ const AIAssistant = () => {
 
   useEffect(() => {
     const fetchLogs = async () => {
-      if (!user) return; 
+      if (!user) return;
       try {
-        const res = await axios.get(`http://127.0.0.1:5001/api/recent-logs?uid=${user.uid}`);
+        const res = await axios.get(`/recent-logs`);
         const threats = res.data.filter(log => log.severity_level <= 3).slice(0, 10);
         setCriticalLogs(threats);
 
         if (threats.length > 0) {
             const latestThreat = threats[0];
-            
+
             // If we have NOT alerted about this specific database object yet
             if (!notifiedIdsRef.current.has(latestThreat._id)) {
-                
+
                 if (latestThreat.message.includes("MongoTimeoutError")) {
-                    setMessages(prev => [...prev, { sender: 'bot', text: `🚨 **CRITICAL SYSTEM OUTAGE** 🚨\n\nI have intercepted a fatal crash in the \`${latestThreat.source}\`. The cluster is unreachable and OOM protocols were invoked. The system is completely offline.` }]);
+                    setMessages(prev => [...prev, { sender: 'bot', text: `🚨 **CRITICAL SYSTEM OUTAGE** 🚨\n\nI have intercepted a fatal crash in the \`${latestThreat.source}\`. The cluster is unreachable and OOM protocols were invoked. Verify the service status before taking action.` }]);
                     notifiedIdsRef.current.add(latestThreat._id);
                 }
                 else if (latestThreat.message.includes("[ANOMALY PATTERN 8]")) {
-                    setMessages(prev => [...prev, { sender: 'bot', text: `⚠️ **PREDICTIVE WARNING** ⚠️\n\nMy machine learning engine has detected an abnormal 400% heap spike in the \`${latestThreat.source}\`. A cascading failure is imminent. Initiating automated failover protocols...` }]);
+                    setMessages(prev => [...prev, { sender: 'bot', text: `⚠️ **PREDICTIVE WARNING** ⚠️\n\nA warning marker was reported in the \`${latestThreat.source}\`. A cascading failure is imminent. Review service memory and connectivity; no failover has been executed.` }]);
                     notifiedIdsRef.current.add(latestThreat._id);
                 }
                 else if (latestThreat.message.includes("[SYSTEM HOTFIX]")) {
-                    setMessages(prev => [...prev, { sender: 'bot', text: `✅ **CRISIS AVERTED** ✅\n\nHotfix deployment detected. Memory leak patched successfully. Operations returning to stable parameters.` }]);
+                    setMessages(prev => [...prev, { sender: 'bot', text: `✅ **CRISIS AVERTED** ✅\n\nA recovery marker was reported. Verify service health before closing the incident.` }]);
                     notifiedIdsRef.current.add(latestThreat._id);
                 }
             }
@@ -68,29 +69,29 @@ const AIAssistant = () => {
     fetchLogs();
     const interval = setInterval(fetchLogs, 3000);
     return () => clearInterval(interval);
-  }, [user]); 
+  }, [user]);
 
   const handleSend = async (customText = null) => {
     const textToSend = customText || input;
-    if (!textToSend.trim() || !user) return;
+    if (!textToSend.trim() || !user || isTyping) return;
 
     setMessages(prev => [...prev, { sender: 'user', text: textToSend }]);
     if (!customText) setInput('');
     setIsTyping(true);
 
     try {
-      const res = await axios.post('http://127.0.0.1:5001/api/chat', { message: textToSend, uid: user.uid });
+      const res = await axios.post('/chat', { message: textToSend, uid: user.uid });
       let botReply = res.data.reply;
       botReply = botReply.replace(/\[THEME_[A-Z]+\]/g, '').trim();
       setMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
-    } catch (err) {
+    } catch {
       setMessages(prev => [...prev, { sender: 'bot', text: "⚠️ Backend offline. Is api.py running?" }]);
     }
     setIsTyping(false);
   };
 
   return (
-    <div className="animate-in" style={{ height: 'calc(100vh - 120px)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', minHeight: 0 }}>
+    <div className="animate-in assistant-layout" style={{ height: 'calc(100vh - 120px)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', minHeight: 0 }}>
       <style>
         {`
           .glass-scroll::-webkit-scrollbar { width: 8px; }
@@ -105,7 +106,7 @@ const AIAssistant = () => {
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
         <header style={{ marginBottom: '1.5rem', flexShrink: 0 }}>
           <h1 style={{ margin: 0 }}>Neural Assistant</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Real-time threat interception and resolution.</p>
+          <p style={{ color: 'var(--text-muted)' }}>Log investigation and advisory responses.</p>
         </header>
 
         <div className="glass-panel glass-scroll" style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0 }}>
@@ -141,8 +142,8 @@ const AIAssistant = () => {
         </div>
 
         <div style={{ padding: '1.5rem', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.1)', display: 'flex', gap: '1rem', flexShrink: 0 }}>
-          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Query system status..." style={{ flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '1rem', color: 'var(--text-main)', outline: 'none' }} />
-          <button onClick={() => handleSend()} style={{ background: '#3b82f6', border: 'none', borderRadius: '12px', padding: '0 1.5rem', cursor: 'pointer', color: 'white' }}><Send size={20} /></button>
+          <input aria-label="Ask the assistant" disabled={isTyping} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Query system status..." style={{ flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '1rem', color: 'var(--text-main)', outline: 'none' }} />
+          <button aria-label="Send message" disabled={isTyping} onClick={() => handleSend()} style={{ background: '#3b82f6', border: 'none', borderRadius: '12px', padding: '0 1.5rem', cursor: 'pointer', color: 'white' }}><Send size={20} /></button>
         </div>
       </div>
     </div>

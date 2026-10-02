@@ -44,7 +44,7 @@ const Login = () => {
 
   return (
     <div style={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-      
+
       {/* INLINE ANIMATION STYLES FOR BUTTERY SMOOTH STARTUP */}
       <style>
         {`
@@ -68,12 +68,12 @@ const Login = () => {
       </style>
 
       <div className="glass-panel" style={{ width: '420px', padding: '3.5rem 2.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(10, 15, 30, 0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        
+
         {/* 1. LOGO */}
         <div className="anim-logo" style={{ borderRadius: '50%', padding: '1.2rem', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', marginBottom: '1.5rem', boxShadow: '0 0 30px rgba(59, 130, 246, 0.2)' }}>
           <BrainCircuit size={42} color="#3b82f6" />
         </div>
-        
+
         {/* 2. TITLE */}
         <h2 className="anim-title" style={{ margin: '0 0 0.5rem 0', letterSpacing: '2px', fontSize: '1.8rem', fontWeight: '800' }}>
           NEUROLOG
@@ -86,7 +86,7 @@ const Login = () => {
 
         {/* 4. FORM (DELAYED FADE IN) */}
         <div className="anim-form" style={{ width: '100%' }}>
-          
+
           {error && (
             <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', padding: '12px', borderRadius: '10px', color: '#f8fafc', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
               <AlertCircle size={16} color="#ef4444" style={{ minWidth: '16px' }} /> <span>{error}</span>
@@ -94,12 +94,12 @@ const Login = () => {
           )}
 
           <form onSubmit={handleNativeAuth} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-            
+
             {/* EMAIL INPUT */}
             <div style={{ position: 'relative' }}>
               <Mail size={18} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: '16px' }} />
-              <input 
-                type="email" placeholder="Developer Email" value={email} onChange={(e) => setEmail(e.target.value)} required
+              <input
+                aria-label="Email" autoComplete="email" type="email" placeholder="Developer Email" value={email} onChange={(e) => setEmail(e.target.value)} required
                 style={{ width: '87%', padding: '14px 14px 14px 44px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'white', fontSize: '0.95rem', outline: 'none', transition: 'border 0.2s' }}
                 onFocus={(e) => e.target.style.border = '1px solid #3b82f6'}
                 onBlur={(e) => e.target.style.border = '1px solid rgba(255,255,255,0.1)'}
@@ -109,20 +109,20 @@ const Login = () => {
             {/* PASSWORD INPUT WITH EYE ICON */}
             <div style={{ position: 'relative' }}>
               <Lock size={18} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: '16px' }} />
-              <input 
-                type={showPassword ? "text" : "password"} placeholder="Passcode" value={password} onChange={(e) => setPassword(e.target.value)} required
+              <input
+                aria-label="Password" autoComplete={isLogin ? "current-password" : "new-password"} type={showPassword ? "text" : "password"} placeholder="Passcode" value={password} onChange={(e) => setPassword(e.target.value)} required
                 style={{ width: '80%', padding: '14px 44px 14px 44px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'white', fontSize: '0.95rem', outline: 'none', transition: 'border 0.2s' }}
                 onFocus={(e) => e.target.style.border = '1px solid #3b82f6'}
                 onBlur={(e) => e.target.style.border = '1px solid rgba(255,255,255,0.1)'}
               />
-              <div 
+              <button type="button" aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword(!showPassword)}
                 style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', right: '16px', cursor: 'pointer', display: 'flex' }}
               >
                 {showPassword ? <EyeOff size={18} color="rgba(255,255,255,0.4)" /> : <Eye size={18} color="rgba(255,255,255,0.4)" />}
-              </div>
+              </button>
             </div>
-            
+
             <button disabled={loading} type="submit" style={{ background: '#3b82f6', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontSize: '1rem', fontWeight: 'bold', cursor: loading ? 'wait' : 'pointer', marginTop: '0.5rem', transition: 'all 0.2s', opacity: loading ? 0.7 : 1, boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)' }} onMouseEnter={e => !loading && (e.target.style.transform = 'translateY(-2px)')} onMouseLeave={e => !loading && (e.target.style.transform = 'translateY(0)')}>
               {loading ? 'Processing...' : (isLogin ? 'Log In' : 'Create Account')}
             </button>
@@ -136,16 +136,16 @@ const Login = () => {
           </div>
 
           {/* --- GOOGLE BUTTON --- */}
-          <button 
+          <button
             onClick={handleGoogleAuth}
             disabled={loading}
-            style={{ 
+            style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-              background: 'rgba(255,255,255,0.05)', color: 'white', padding: '12px', borderRadius: '12px', 
-              border: '1px solid rgba(255,255,255,0.1)', fontWeight: 'bold', fontSize: '0.95rem', cursor: loading ? 'wait' : 'pointer', 
-              transition: 'all 0.2s' 
+              background: 'rgba(255,255,255,0.05)', color: 'white', padding: '12px', borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.1)', fontWeight: 'bold', fontSize: '0.95rem', cursor: loading ? 'wait' : 'pointer',
+              transition: 'all 0.2s'
             }}
-            onMouseEnter={e => !loading && (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')} 
+            onMouseEnter={e => !loading && (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
             onMouseLeave={e => !loading && (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

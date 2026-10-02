@@ -12,7 +12,7 @@ try:
     raw_col = db["raw_logs"]
     processed_col = db["processed_logs"]
     health_col = db["system_health"]
-    anomalies_col = db["anomalies"] 
+    anomalies_col = db["anomalies"]
     print("✅ TE Engine Connected to MongoDB")
 except Exception as e:
     print(f"❌ DB Error: {e}")
@@ -20,12 +20,12 @@ except Exception as e:
 
 def process_logs():
     print("🧠 TE Engine Watching for Patterns...")
-    
+
     while True:
         try:
             # 1. Fetch new logs
             logs = list(raw_col.find({"processed": {"$ne": True}}).limit(100))
-            
+
             if not logs:
                 time.sleep(1)
                 continue
@@ -36,7 +36,7 @@ def process_logs():
             error_count = 0
             info_count = 0
             warning_count = 0
-            
+
             # Pattern Counters
             security_triggers = 0
             inventory_triggers = 0
@@ -44,7 +44,7 @@ def process_logs():
             for log in logs:
                 # Mark as processed
                 raw_col.update_one({"_id": log["_id"]}, {"$set": {"processed": True}})
-                
+
                 # Copy to processed collection
                 p_log = log.copy()
                 if "_id" in p_log: del p_log["_id"]
@@ -67,7 +67,7 @@ def process_logs():
             # 2. Update System Health (PERSISTENT METRICS)
             # We fetch the old stats to keep the counters growing smoothly
             old_stats = health_col.find_one({"_id": "main_stats"}) or {}
-            
+
             # Calculate Health: Starts at 100, drops heavily for Criticals
             current_health = 100 - (critical_count * 5) - (error_count * 2)
             current_health = max(10, min(100, current_health)) # Clamp between 10-100
@@ -86,32 +86,32 @@ def process_logs():
             )
 
             # 3. Persistent Anomaly Cards
-            # We use 'upsert=True' so we Update existing cards or Create new ones. 
+            # We use 'upsert=True' so we Update existing cards or Create new ones.
             # We do NOT delete old ones, so they stay on the dashboard!
-            
+
             if security_triggers > 0:
                 anomalies_col.update_one(
                     {"type": "security"},
                     {"$set": {
                         "title": "Malicious Bot Pattern",
-                        "confidence": 98,
-                        "events": (old_stats.get("security_events", 0) + security_triggers * 12),
+                        "detection_method": "keyword rule",
+                        "events": (old_stats.get("security_events", 0) + security_triggers),
                         "pattern": "\"Malicious Bot Pattern\"",
-                        "action": "High confidence fraud detected. Auto-ban IP range and enable CAPTCHA on checkout.",
+                        "action": "Security keywords observed. Investigate the source before applying controls.",
                         "severity": "critical"
                     }},
                     upsert=True
                 )
-            
+
             if inventory_triggers > 0:
                 anomalies_col.update_one(
                     {"type": "database"},
                     {"$set": {
                         "title": "Inventory Database Desynchronization",
-                        "confidence": 92,
-                        "events": (old_stats.get("inventory_events", 0) + inventory_triggers * 8),
+                        "detection_method": "keyword rule",
+                        "events": (old_stats.get("inventory_events", 0) + inventory_triggers),
                         "pattern": "\"Inventory Database Desynchronization\"",
-                        "action": "Race condition in 'products' table. Enable Optimistic Locking to prevent overselling.",
+                        "action": "Inventory keywords observed. Review stock consistency and concurrent updates.",
                         "severity": "warning"
                     }},
                     upsert=True

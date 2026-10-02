@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../context/useTheme';
 import { X, Moon, Sun, Monitor } from 'lucide-react';
 
 const ThemeSettings = ({ onClose }) => {
@@ -32,7 +32,7 @@ const ThemeSettings = ({ onClose }) => {
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="animate-in">
       <div className="glass-panel" style={{ width: '400px', padding: '2rem', position: 'relative' }}>
-        
+
         <button onClick={onClose} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}>
           <X size={24} />
         </button>
@@ -43,13 +43,13 @@ const ThemeSettings = ({ onClose }) => {
           <p style={{ color: 'var(--text-muted)', marginBottom: '10px', fontSize: '0.9rem' }}>Appearance</p>
           <div style={{ display: 'flex', gap: '10px' }}>
             {['system', 'dark', 'light'].map(mode => (
-              <button 
+              <button
                 key={mode}
                 onClick={() => setThemeMode(mode)}
-                style={{ 
+                style={{
                   flex: 1, padding: '10px', borderRadius: '12px', cursor: 'pointer',
                   background: themeMode === mode ? '#3b82f6' : 'var(--glass-bg)',
-                  color: themeMode === mode ? 'white' : 'var(--text-main)', 
+                  color: themeMode === mode ? 'white' : 'var(--text-main)',
                   border: '1px solid var(--glass-border)',
                   textTransform: 'capitalize', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   transition: 'all 0.2s',
@@ -67,35 +67,35 @@ const ThemeSettings = ({ onClose }) => {
           <p style={{ color: 'var(--text-muted)', marginBottom: '10px', fontSize: '0.9rem' }}>Ambient Mesh Theme</p>
           <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
             {/* The Default Auto Button */}
-            <button 
-                onClick={() => setBackground(null)} 
-                style={{ 
-                    width: '44px', height: '44px', borderRadius: '50%', background: 'var(--glass-bg)', 
-                    border: !background ? '2px solid #3b82f6' : '1px solid var(--glass-border)', 
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                    color: 'var(--text-main)', fontSize: '11px', fontWeight: 'bold' 
-                }} 
+            <button
+                onClick={() => setBackground(null)}
+                style={{
+                    width: '44px', height: '44px', borderRadius: '50%', background: 'var(--glass-bg)',
+                    border: !background ? '2px solid #3b82f6' : '1px solid var(--glass-border)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--text-main)', fontSize: '11px', fontWeight: 'bold'
+                }}
             >
                 Auto
             </button>
-            
+
             {/* The Animated Mesh Preset Orbs */}
             {presets.map((preset, index) => {
               const isActive = background?.name === preset.name;
               return (
-                <button 
-                  key={index} 
-                  onClick={() => setBackground(preset)} 
+                <button
+                  key={index}
+                  onClick={() => setBackground(preset)}
                   title={preset.name}
-                  style={{ 
-                    width: '44px', height: '44px', borderRadius: '50%', 
+                  style={{
+                    width: '44px', height: '44px', borderRadius: '50%',
                     backgroundColor: preset.base,
                     backgroundImage: preset.mesh, // Previews the actual gradient!
-                    border: isActive ? '2px solid #fff' : '1px solid rgba(255,255,255,0.1)', 
-                    cursor: 'pointer', 
-                    boxShadow: isActive ? '0 0 15px rgba(255,255,255,0.4)' : '0 4px 10px rgba(0,0,0,0.3)', 
-                    transition: 'transform 0.2s, box-shadow 0.2s' 
-                  }} 
+                    border: isActive ? '2px solid #fff' : '1px solid rgba(255,255,255,0.1)',
+                    cursor: 'pointer',
+                    boxShadow: isActive ? '0 0 15px rgba(255,255,255,0.4)' : '0 4px 10px rgba(0,0,0,0.3)',
+                    transition: 'transform 0.2s, box-shadow 0.2s'
+                  }}
                   onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
                   onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                 />

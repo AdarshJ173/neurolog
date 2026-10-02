@@ -1,19 +1,14 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getAnalytics } from "firebase/analytics";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyD2MdSQYBp7VAFTwT0S-VQzZH1oaPq02hs",
-  authDomain: "neurolog-ndm.firebaseapp.com",
-  projectId: "neurolog-ndm",
-  storageBucket: "neurolog-ndm.firebasestorage.app",
-  messagingSenderId: "255582903071",
-  appId: "1:255582903071:web:b48ffbace0af08e087ee2a",
-  measurementId: "G-6RBK2D5S8N"
+import { initializeApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+export const demoMode = import.meta.env.VITE_DEMO_MODE !== 'false';
+const config = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-export const auth = getAuth(app);
+export const firebaseConfigured = Object.values(config).every(Boolean);
+export const auth = demoMode
+  ? { currentUser: { uid: 'demo-user', email: 'demo@localhost' } }
+  : firebaseConfigured ? getAuth(initializeApp(config)) : null;
 export const googleProvider = new GoogleAuthProvider();

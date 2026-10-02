@@ -1,94 +1,71 @@
-🧠 NeuroLog AI: Predictive AIOps Observability
-Transforming Reactive Troubleshooting into Proactive Resilience.
+# NeuroLog AI
 
-NeuroLog is a high-performance, real-time log monitoring and anomaly detection platform. By combining Unsupervised Clustering (HDBSCAN) with Supervised Risk Classification (XGBoost), NeuroLog identifies system threats with 94% accuracy before they lead to downtime.
+A local log observability application with React, Flask, SQLite, TF-IDF/DBSCAN clustering, and optional Firebase authentication and Groq advisory responses.
 
-🚀 Core Features
-Real-Time Ingestion: High-throughput API pipeline for streaming JSON logs.
+## Preview
 
-Predictive Early Warning (EWS): Detects "Death Spiral" patterns (like heap spikes) 15–30 seconds before system failure.
+![Local demo](docs/preview.png)
 
-Hybrid AI Core: 
-HDBSCAN: Identifies zero-day anomalies without manual rules.
+## Run on Windows
 
-XGBoost (94% Accuracy): Classifies known risks and predicts system impact.
+Requires Python 3.12 and Node.js 22.12+.
 
-NeuroLog AI Assistant: A Llama-3 powered SRE(Site Reliability Engineer) advisor that provides plain-English root cause analysis and one-click remediation scripts.
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-lock.txt
+cd logintel_ui
+npm ci
+cd ..
+.\.venv\Scripts\python.exe LogIntel_engine\api.py
+```
 
-Glass-morphism Dashboard: A modern React interface designed for low-cognitive load during high-stress incidents.
+In another terminal:
 
-🛠️ Technical Stack
-Frontend: React.js, Tailwind CSS, Recharts (Real-time visualizations)
+```powershell
+cd logintel_ui
+npm run dev
+```
 
-Backend: Python (Flask), Node.js (API Gateway)
+Open http://127.0.0.1:5173. Click **Load sample logs**, then **Run clustering**. Demo mode needs no external accounts and persists data in `data/neurolog.db`. Keep the demo local; real accounts require both demo flags disabled and your own Firebase configuration.
 
-Database: MongoDB (Time-series log storage)
+A convenience launcher is also available: `powershell -ExecutionPolicy Bypass -File .\start.ps1`.
 
-AI/ML: Scikit-Learn (TF-IDF), XGBoost, HDBSCAN, Groq/Llama-3 (LLM)
+## Learn and configure
 
-🧬 Methodology & Pipeline
-Ingestion: External systems stream logs via a secure API Key-authenticated gateway.
+- [User guide](docs/USER_GUIDE.md): setup, workflow, ingestion examples, architecture, Firebase/Groq configuration, and troubleshooting.
+- [PDF guide](output/pdf/NeuroLog_User_Guide.pdf): printable version of the guide.
+- [Repair and validation notes](docs/REPAIR_NOTES.md).
 
-Vectorization: Raw text is transformed into high-dimensional numerical vectors using TF-IDF.
+Copy root `.env.example` to `.env` for backend configuration, and `logintel_ui/.env.example` to `.env.local` inside `logintel_ui` for frontend configuration. Secrets and runtime databases are ignored by Git.
 
-Classification: The XGBoost Risk Module analyzes vectors against historical failure patterns.
+## What is implemented
 
-Clustering: HDBSCAN isolates outliers, flagging them as potential unknown threats.
+- API-key ingestion with validation and UTC timestamps.
+- Workspace ownership verified through Firebase tokens in authenticated mode.
+- Durable SQLite storage, retention settings, and scoped log purging.
+- Live Monitor, Log Explorer search/severity filters, and Vector Analysis.
+- On-demand TF-IDF and DBSCAN clustering of the latest 100 messages.
+- Local demo advisor, or live Groq responses when configured.
+- Appearance settings and optional desktop alerts for newly observed critical logs.
+- Optional Node compatibility gateway and log simulator.
 
-Remediation: The LLM Module generates context-aware fixes based on the specific system state.
+The health score is a heuristic over recent critical logs. Text outliers are review candidates, not proof of faults. Incident cards reflect supplied log markers. This code does not include XGBoost, HDBSCAN, a validated 94% accuracy result, or automatic remediation. Slack/email integrations and alternate assistant styles are disabled rather than presented as working controls.
 
-👥 Our Team
-We built NeuroLog as a cohesive engineering unit, splitting the architecture into specialized domains:
+## Verification
 
-Sai Nitin(https://github.com/Sai-Nitin123) — Full-Stack Lead & System Integrator
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+cd logintel_ui
+npm run lint
+npm run build
+npm audit
+cd ..\server
+npm run check
+npm audit
+```
 
-Engineered the entire application architecture, including the Node.js Gateway and Flask Server setup.
-Led the Full-Stack development, connecting the React frontend to the MongoDB log-store.
-Handled the AI & API Integration, ensuring the LLM (Llama-3) and ML models were successfully connected to the live data stream.
+GitHub Actions repeats backend tests, frontend lint/build, gateway syntax checks, and npm audits.
 
-Dhruv Patel(https://github.com/DhruvPatel0110) — Machine Learning Engineer
+## Attribution
 
-Developed and fine-tuned the core intelligence engines: HDBSCAN for unsupervised clustering and the XGBoost Risk Module.
-Achieved the 94% classification accuracy through rigorous feature engineering and TF-IDF vectorization.
-
-Manoj Kolapalli(https://github.com/Manojkolapalli)— QA & Systems Simulation
-
-Developed the Synthetic Incident Simulator (the dummy app) to stress-test the platform.
-Validated the Early Warning System (EWS) by creating "Death Spiral" scenarios to ensure high-fidelity detection under pressure.
-
-To minimize latency, we bypassed traditional transformation layers and went with a Direct-to-Vector pipeline. Our frontend components (like Traffic_Bot.js) pull raw telemetry directly, while our backend handles the mathematical lifting.
-
-**The Shift to Real-Time Observability:-**
-
-_**The Legacy Pipeline(What we moved away from)**_:-
-1. _The Manual Process_: Required starting a server.js and a traffic_board.js to fake logs.
-
-2. _The Bottleneck_: Data had to be written to a physical app.log.txt file, then passed through a Transformation Engine (te.py) before reaching the database.
-
-3. _The Problem_: File I/O (reading/writing to text files) is slow and doesn't scale for real-world servers.
-
-_**⚡ Modernized Data Flow(The Updated NeuroLog Pipeline)**_
-Our updated architecture moves away from file-based batch processing to a Live Streaming API Pipeline.
-
-1. Zero-Configuration Ingestion: External applications connect via our unified API endpoint. This eliminates the legacy server.js gateway and physical app.log.txt dependencies.
-
-2. Unified Backend: The Flask core now handles ingestion, ML-processing, and LLM-advisory tasks simultaneously, reducing data hopping and latency.
-
-3. Dynamic Sourcing: By decoupling the log generator, NeuroLog can now monitor multiple distributed environments at once, aggregating data into a single MongoDB time-series store.
-
-
-🛠️ Step-by-Step Technical Setup
-1. Ingestion Gateway (Node.js)
-What to do: Open a terminal in the server or backend folder. Run npm install then node gateway.js.
-The Logic: This starts the Port 5000 listener. It is the "Ear" of the project. It waits for JSON logs from the Dummy App and pipes them straight into MongoDB.
-
-2. AI Intelligence Engine (Python Flask)
-What to do: Open a second terminal. Run pip install -r requirements.txt then python api.py.
-The Logic: This starts the Port 5001 service. This is the "Brain." Every few seconds, it performs the TF-IDF Vectorization and runs the XGBoost Risk Module. It calculates the 94% accuracy score and prepares the Llama-3 advisory response.
-
-3. The Command Center (React)
-What to do: Open a third terminal in the client or logintel_ui folder. Run npm install then npm run dev.
-The Logic: This launches the Port 5173 (Vite) interface. It uses Short-Polling to check both backends simultaneously—fetching the raw logs from Node.js and the AI insights from Flask.
-
-Why the 94% Accuracy matters?
-Unlike traditional monitoring tools that rely on "if-then" logic, NeuroLog uses Gradient Boosting. This allows the model to learn the subtle mathematical relationships between latency, status codes, and heap memory, resulting in nearly perfect threat classification.
+Based on [Sai-Nitin123/Neurolog-AI](https://github.com/Sai-Nitin123/Neurolog-AI). Original contributors: Sai Nitin, Dhruv Patel, and Manoj Kolapalli. The original [MIT license](LICENSE) is retained. The legacy MongoDB/file-courier examples are separate from the supported SQLite dashboard pipeline.
