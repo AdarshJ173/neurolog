@@ -78,6 +78,15 @@ def test_chat_and_bounds(app):
     assert client.post('/api/chat', data='x' * 70000, content_type='application/json').status_code == 413
 
 
+def test_provider_failure_falls_back_to_evidence(app, monkeypatch):
+    monkeypatch.setenv('GROQ_API_KEY', 'test-only-placeholder')
+    with patch('groq.Groq', side_effect=ConnectionError('provider unavailable')):
+        response = app.test_client().post('/api/chat', json={'message': 'Investigate logs'})
+    assert response.status_code == 200
+    assert response.json['mode'] == 'local'
+    assert 'unavailable' in response.json['provider_warning']
+
+
 def test_production_auth_and_user_isolation(tmp_path):
     import firebase_admin
     from firebase_admin import auth

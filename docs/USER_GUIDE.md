@@ -20,7 +20,7 @@ After changing backend code, restart managed services using the same command wit
 4. Use search and severity filters to inspect the received events.
 5. Click Run clustering, then open Vector Analysis to inspect message groups and outliers.
 
-Task changes are persisted in SQLite. Each request produces a log containing method, path, status and measured duration. Every five seconds, a heartbeat records measured uptime, request count, tasks, completions and queued events. Healthy activity normally produces INFO logs; genuine rejected requests produce WARNING logs and failures produce ERROR logs. There are no preloaded events or random failures.
+Task changes are persisted in SQLite. Each request produces a log containing method, path, status and measured duration. Every five seconds, a heartbeat records measured uptime, request count, tasks, completions and queued events. Healthy activity normally produces INFO logs; genuine rejected requests produce WARNING logs and failures produce ERROR logs. No events are preloaded. Optional random generation is available through Start generating and Stop generating, with a configurable interval (0.2 to 10 seconds) and entry limit (1 to 1000). Each generated event starts with [GENERATED], and the run stops at its limit.
 
 The dashboard polls every two seconds and Explorer every three seconds, so delivery and display are near real time rather than a push connection. Clustering runs when requested; dashboard updates alone do not retrain it.
 
@@ -68,7 +68,7 @@ Received records use `data/neurolog-live.db`; tasks use `data/tasks.db`; undeliv
 
 TF-IDF transforms received message text into vectors. DBSCAN groups similar vectors and marks noise as candidate outliers. Review unusual messages in context. The health score is a heuristic derived from recent critical logs, not a verified uptime measurement. The task service heartbeat contains actual measured uptime.
 
-Without GROQ_API_KEY, the assistant produces a calculated summary of received logs. With a valid optional Groq key configured for the backend, it requests conversational analysis. It never executes fixes.
+Without GROQ_API_KEY, the assistant groups received warnings, errors and stored outliers using transparent local rules, cites evidence IDs, and suggests investigation steps. Enter source:task-service to narrow the local analysis. Generated and actual incidents are kept separate. The interface shows the active mode; provider failure falls back to local analysis with a notice. With a valid optional Groq key configured for the backend, it requests conversational analysis. It never executes fixes.
 
 ## 6. Troubleshooting and validation
 

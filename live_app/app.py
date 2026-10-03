@@ -8,6 +8,7 @@ from pathlib import Path
 from flask import Flask, g, jsonify, request, send_file
 from werkzeug.exceptions import HTTPException
 from live_app.log_shipper import NeuroLogHandler
+from live_app.generator import LogGenerator
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -20,6 +21,8 @@ def create_app(config=None, log_handler=None):
     logger = logging.Logger('task-service', logging.INFO)
     logger.addHandler(log_handler or logging.StreamHandler())
     app.extensions['event_logger'] = logger
+    generator = LogGenerator(logger)
+    app.extensions['generator'] = generator
     app.extensions['started'] = time.monotonic()
     app.extensions['request_count'] = 0
     app.extensions['counter_lock'] = threading.Lock()
@@ -51,7 +54,8 @@ def create_app(config=None, log_handler=None):
             app.extensions['request_count'] += 1
         level = logging.ERROR if response.status_code >= 500 else logging.WARNING if response.status_code >= 400 else logging.INFO
         # Log path and status, never request headers, credentials, or request bodies.
-        logger.log(level, 'HTTP %s %s status=%d duration_ms=%.2f', request.method, request.path, response.status_code, duration)
+        if request.method != 'GET' or request.path != '/generator':
+            logger.log(level, 'HTTP %s %s status=%d duration_ms=%.2f', request.method, request.path, response.status_code, duration)
         return response
 
     @app.errorhandler(HTTPException)
@@ -72,6 +76,25 @@ def create_app(config=None, log_handler=None):
         with app.extensions['counter_lock']:
             count = app.extensions['request_count']
         return jsonify(status='ok', service='task-service', uptime_seconds=round(time.monotonic() - app.extensions['started'], 1), requests=count)
+
+    @app.route('/generator', methods=['GET', 'POST', 'DELETE'])
+    def control_generator():
+        if request.method == 'DELETE':
+            generator.stop()
+        elif request.method == 'POST':
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict):
+                return jsonify(error='Send interval and limit as a JSON object.'), 400
+            interval, limit = data.get('interval', 1), data.get('limit', 100)
+            if type(interval) not in (int, float) or not 0.2 <= interval <= 10:
+                return jsonify(error='Interval must be between 0.2 and 10 seconds.'), 400
+            if type(limit) is not int or not 1 <= limit <= 1000:
+                return jsonify(error='Limit must be between 1 and 1000 entries.'), 400
+            try:
+                generator.start(interval, limit)
+            except ValueError as error:
+                return jsonify(error=str(error)), 409
+        return jsonify(generator.status())
 
     @app.route('/tasks', methods=['GET', 'POST'])
     def tasks():
@@ -128,6 +151,7 @@ def main():
         app.run(host='127.0.0.1', port=8000, debug=False, threaded=True)
     finally:
         stopped.set()
+        app.extensions['generator'].stop()
         logger.info('Task service stopping')
         handler.close()
 

@@ -15,6 +15,7 @@ const AIAssistant = () => {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [criticalLogs, setCriticalLogs] = useState([]);
+  const [analysisMode, setAnalysisMode] = useState('Ask a question to check analysis mode.');
 
   // 🚨 FIX: Use a ref Set to permanently track IDs we've already alerted about (No double posting!)
   const notifiedIdsRef = useRef(new Set());
@@ -59,6 +60,7 @@ const AIAssistant = () => {
 
     try {
       const res = await axios.post('/chat', { message: textToSend });
+      setAnalysisMode(res.data.provider_warning || (res.data.mode === 'groq' ? 'Language model: Groq' : 'Local rule-based analysis · Configure GROQ_API_KEY for language-model responses'));
       let botReply = res.data.reply;
       botReply = botReply.replace(/\[THEME_[A-Z]+\]/g, '').trim();
       setMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
@@ -85,6 +87,8 @@ const AIAssistant = () => {
         <header style={{ marginBottom: '1.5rem', flexShrink: 0 }}>
           <h1 style={{ margin: 0 }}>Neural Assistant</h1>
           <p style={{ color: 'var(--text-muted)' }}>Log investigation and advisory responses.</p>
+          <p role="status" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{analysisMode}</p>
+          <button disabled={isTyping} onClick={() => handleSend('Investigate recent errors and suggest next checks')}>Investigate recent logs</button>
         </header>
 
         <div className="glass-panel glass-scroll" style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0 }}>
@@ -94,7 +98,7 @@ const AIAssistant = () => {
               <div key={idx} style={{ background: 'rgba(239, 68, 68, 0.1)', borderLeft: '4px solid #ef4444', padding: '1rem', borderRadius: '0 8px 8px 0', flexShrink: 0 }}>
                 <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '0.85rem' }}>[{log.severity_label}] {log.source}</span>
                 <p style={{ margin: '8px 0 12px 0', fontSize: '0.9rem', fontFamily: 'monospace' }}>{log.message}</p>
-                <button onClick={() => handleSend(`Investigate this received log: "${log.message}"`)} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button disabled={isTyping} onClick={() => handleSend(`Investigate source:${log.source} and this received log: "${log.message}"`)} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Bot size={14} /> Investigate
                 </button>
               </div>

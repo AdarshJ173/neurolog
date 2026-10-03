@@ -1,4 +1,5 @@
 import logging
+import time
 from live_app.app import create_app
 from live_app.log_shipper import NeuroLogHandler
 
@@ -75,4 +76,28 @@ def test_invalid_updates_and_missing_tasks(tmp_path):
     assert client.post('/tasks', json=[]).status_code == 400
     assert client.post('/tasks', json={'title': 'x' * 201}).status_code == 400
     assert client.get('/health').json['service'] == 'task-service'
+    handler.close()
+
+
+def test_generator_limit_validation_and_stop(tmp_path):
+    delivered = []
+    handler = make_handler(tmp_path, delivered.append)
+    app = create_app({'TESTING': True, 'DATABASE': str(tmp_path / 'tasks.db')}, handler)
+    client = app.test_client()
+    assert not client.get('/generator').json['running']
+    assert client.post('/generator', json={'interval': 0, 'limit': 10}).status_code == 400
+    assert client.post('/generator', json={'interval': 1, 'limit': True}).status_code == 400
+    assert client.post('/generator', json={'interval': .2, 'limit': 2}).status_code == 200
+    assert client.post('/generator', json={'interval': .2, 'limit': 2}).status_code == 409
+    app.extensions['generator'].thread.join(timeout=3)
+    assert client.get('/generator').json['generated'] == 2
+    assert not client.get('/generator').json['running']
+    while handler.deliver_one():
+        pass
+    assert len([row for row in delivered if row['message'].startswith('[GENERATED]')]) == 2
+    client.post('/generator', json={'interval': 10, 'limit': 100})
+    assert client.delete('/generator').status_code == 200
+    count = app.extensions['generator'].generated
+    time.sleep(.05)
+    assert app.extensions['generator'].generated == count
     handler.close()
