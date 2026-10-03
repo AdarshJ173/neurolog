@@ -1,107 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import axios from '../api';
-import { Search, Filter, AlertTriangle, ShieldAlert, Info } from 'lucide-react';
-
-const LogExplorer = () => {
-  const [logs, setLogs] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [severity, setSeverity] = useState('all');
-  const [loading, setLoading] = useState(true);
-
-  // Fetch the live logs from MongoDB
-  useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        // Fetch a larger chunk for the explorer (e.g., limit 50 or 100 in your backend if you updated it)
-        const res = await axios.get(`/recent-logs`);
-        setLogs(res.data);
-      } catch (err) {
-        console.error("Failed to fetch logs", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLogs();
-    // Refresh every 5 seconds to keep the explorer updated
-    const interval = setInterval(fetchLogs, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Filter logs based on search bar
-  const filteredLogs = logs.filter(log =>
-    (severity === 'all' || (severity === 'errors' ? log.severity_level <= 3 : log.severity_level >= 4)) && (log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.source.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  const getSeverityIcon = (level) => {
-    if (level <= 2) return <ShieldAlert color="#ef4444" size={16} />; // CRITICAL
-    if (level === 3) return <AlertTriangle color="#f59e0b" size={16} />; // WARNING
-    return <Info color="#3b82f6" size={16} />; // INFO/DEBUG
-  };
-
-  const getSeverityColor = (level) => {
-    if (level <= 2) return '#ef4444';
-    if (level === 3) return '#f59e0b';
-    return '#3b82f6';
-  };
-
-  return (
-    <div className="animate-in" style={{ height: 'calc(100vh - 60px)', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ margin: 0, color: 'var(--text-main)' }}>Log Explorer</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Search and filter raw telemetry data across all connected services.</p>
-      </header>
-
-      {/* SEARCH AND FILTER BAR */}
-      <div className="glass-panel" style={{ display: 'flex', gap: '1rem', padding: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{ flex: 1, position: 'relative' }}>
-          <Search size={18} color="var(--text-muted)" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: '12px' }} />
-          <input
-            aria-label="Search logs" type="text"
-            placeholder="Search logs by message or service..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '100%', padding: '10px 10px 10px 38px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-main)', outline: 'none' }}
-          />
-        </div>
-        <select aria-label="Filter severity" value={severity} onChange={e => setSeverity(e.target.value)}>
-          <option value="all">All severities</option><option value="errors">Errors / critical</option><option value="routine">Warnings / routine</option>
-        </select>
-      </div>
-
-      {/* LOG TABLE */}
-      <div className="glass-panel" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div className="log-row" style={{ display: 'grid', gridTemplateColumns: '150px 150px 1fr', padding: '1rem', borderBottom: '1px solid var(--glass-border)', fontWeight: 'bold', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-          <div>TIMESTAMP</div>
-          <div>SOURCE</div>
-          <div>MESSAGE</div>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {loading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading live streams...</div>
-          ) : filteredLogs.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No logs match your search.</div>
-          ) : (
-            filteredLogs.map((log) => (
-              <div className="log-row" key={log._id} style={{
-                display: 'grid', gridTemplateColumns: '150px 150px 1fr', padding: '1rem',
-                borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', fontSize: '0.85rem',
-                borderLeft: `3px solid ${getSeverityColor(log.severity_level)}`
-              }}>
-                <div style={{ color: 'var(--text-muted)' }}>{new Date(log.timestamp).toLocaleTimeString()}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', fontWeight: 'bold' }}>
-                  {getSeverityIcon(log.severity_level)} {log.source}
-                </div>
-                <div style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>{log.message}</div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default LogExplorer;
+import {useState,useEffect} from 'react';
+import {Link,useSearchParams} from 'react-router-dom';
+import {Search, Pause, Play, X, ArrowUpRight} from 'lucide-react';
+import api from '../api';
+import LogBadge from '../components/LogBadge';
+export default function LogExplorer(){
+ const [params]=useSearchParams();
+ const [logs,setLogs]=useState([]),[search,setSearch]=useState(''),[severity,setSeverity]=useState(params.get('severity')||'all'),[source,setSource]=useState('all'),[kind,setKind]=useState('all'),[paused,setPaused]=useState(false),[selected,setSelected]=useState(null),[loaded,setLoaded]=useState(false),[updated,setUpdated]=useState(null);
+ useEffect(()=>{let active=true;async function refresh(){try{const result=await api.get('/recent-logs?limit=300');if(active){setLogs(result.data);setUpdated(new Date());setLoaded(true);}}catch{/* shared banner */}}if(!paused)refresh();const timer=setInterval(()=>{if(!paused)refresh();},3000);return()=>{active=false;clearInterval(timer);};},[paused]);
+ const filtered=logs.filter(log=>(severity==='all'||(severity==='errors'?log.severity_level<=3:severity==='warning'?log.severity_level===4:log.severity_level>=5))&&(source==='all'||source===log.source)&&(kind==='all'||(kind==='generated')===log.message.startsWith('[GENERATED]'))&&`${log.message} ${log.source}`.toLowerCase().includes(search.toLowerCase()));
+ return <section><div className="page-heading"><div><span className="eyebrow">EXPLORE & INVESTIGATE</span><h1>Log workspace</h1><p>Find the signal in your application activity.</p></div><button className="secondary" onClick={()=>setPaused(!paused)}>{paused?<Play size={16}/>:<Pause size={16}/>} {paused?'Resume updates':'Pause updates'}</button></div>
+ <div className="panel"><div className="filterbar"><label className="search-field"><Search size={18}/><input aria-label="Search logs" placeholder="Search messages or services…" value={search} onChange={e=>setSearch(e.target.value)}/></label><select aria-label="Filter severity" value={severity} onChange={e=>setSeverity(e.target.value)}><option value="all">All severities</option><option value="errors">Errors & critical</option><option value="warning">Warnings</option><option value="routine">Routine activity</option></select><select aria-label="Filter source" value={source} onChange={e=>setSource(e.target.value)}><option value="all">All sources</option>{[...new Set(logs.map(l=>l.source))].map(s=><option key={s}>{s}</option>)}</select><select aria-label="Filter origin" value={kind} onChange={e=>setKind(e.target.value)}><option value="all">All origins</option><option value="actual">Actual activity</option><option value="generated">Generated scenarios</option></select></div><div className="table-meta"><span>{filtered.length} matching / {logs.length} recent records</span><span><span className={`status-dot ${paused?'paused':''}`}/>{paused?'Updates paused':updated?`Updated ${updated.toLocaleTimeString()}`:'Connecting…'}</span></div>
+ <div className="table-scroll"><table className="log-table"><thead><tr><th>Time</th><th>Severity</th><th>Source</th><th>Message</th><th><span className="sr-only">Details</span></th></tr></thead><tbody>{filtered.map(log=><tr key={log._id} className={selected?._id===log._id?'selected':''}><td className="time-cell">{new Date(log.timestamp).toLocaleTimeString()}</td><td><LogBadge log={log}/></td><td>{log.source}</td><td className="message-cell"><span className="message-preview">{log.message}</span>{log.ml_anomaly? <span className="badge purple">Outlier</span>:null}</td><td><button className="icon-button" aria-label={`Inspect log ${log._id}`} onClick={()=>setSelected(log)}><ArrowUpRight size={17}/></button></td></tr>)}</tbody></table></div>{!filtered.length&&<div className="empty-state">{loaded?'No matching logs. Adjust your filters or generate activity in the Python app.':'Loading received records…'}<button className="secondary" onClick={()=>{setSearch('');setSeverity('all');setSource('all');setKind('all');}}>Reset filters</button></div>}</div>
+ {selected&&<aside className="detail-panel" aria-label="Log details"><div className="panel-heading"><h2>Record #{selected._id}</h2><button className="icon-button" aria-label="Close log details" onClick={()=>setSelected(null)}><X size={18}/></button></div><LogBadge log={selected}/><dl><dt>Source</dt><dd>{selected.source}</dd><dt>Received</dt><dd>{new Date(selected.timestamp).toLocaleString()}</dd><dt>Origin</dt><dd>{selected.message.startsWith('[GENERATED]')?'Generated scenario':'Application activity'}</dd><dt>Analysis</dt><dd>{selected.cluster_id===null?'Not analyzed':`Cluster ${selected.cluster_id}${selected.ml_anomaly?' · Outlier':''}`}</dd></dl><pre>{selected.message}</pre><Link className="button primary" to={`/assistant?source=${encodeURIComponent(selected.source)}`}>Investigate source <ArrowUpRight size={16}/></Link></aside>}
+ </section>;
+}

@@ -1,29 +1,9 @@
-import { useEffect, useState } from 'react';
+import {useState,useEffect} from 'react';
+import {Link} from 'react-router-dom';
+import {ArrowUpRight,Layers3} from 'lucide-react';
 import api from '../api';
-
-export default function VectorAnalysis() {
-  const [logs, setLogs] = useState([]);
-  useEffect(() => {
-    let active = true;
-    const refresh = async () => {
-      try { const result = await api.get('/recent-logs'); if (active) setLogs(result.data); }
-      catch { /* Global error banner supplies recovery instructions. */ }
-    };
-    refresh();
-    const timer = setInterval(refresh, 3000);
-    return () => { active = false; clearInterval(timer); };
-  }, []);
-  const anomalies = logs.filter(log => log.ml_anomaly);
-  const analyzed = logs.filter(log => log.cluster_id !== null);
-  return <section>
-    <h1>Vector Analysis</h1>
-    <p>TF-IDF converts messages into word-weight vectors. DBSCAN groups similar messages; cluster -1 marks isolated messages.</p>
-    <p>{analyzed.length} analyzed logs · {anomalies.length} outliers in the current window.</p>
-    <p>Use Run clustering after adding logs. An outlier is a review candidate; it does not prove a fault.</p>
-    {!anomalies.length && <p role="status">No outliers in the current window. Run clustering with at least five logs.</p>}
-    {anomalies.map(log => <article className="glass-panel" key={log._id} style={{padding:24, marginBottom:16}}>
-      <h2>{log.source} · {log.severity_label}</h2>
-      <p>{log.message}</p><p>Cluster {log.cluster_id} · {new Date(log.timestamp).toLocaleString()}</p>
-    </article>)}
-  </section>;
+import LogBadge from '../components/LogBadge';
+export default function Analysis(){const [logs,setLogs]=useState([]);useEffect(()=>{let active=true;async function refresh(){try{const result=await api.get('/recent-logs?limit=300');if(active)setLogs(result.data);}catch{/* shared banner */}}refresh();const timer=setInterval(refresh,5000);return()=>{active=false;clearInterval(timer);};},[]);
+ const analyzed=logs.filter(l=>l.cluster_id!==null),outliers=logs.filter(l=>l.ml_anomaly),clusters=new Set(analyzed.filter(l=>l.cluster_id!==-1).map(l=>l.cluster_id));
+ return <section><div className="page-heading"><div><span className="eyebrow">MESSAGE PATTERNS</span><h1>Anomaly analysis</h1><p>Review unusual messages and groups discovered in your log stream.</p></div><Layers3 size={28} color="var(--accent)"/></div><div className="stats-grid"><article className="panel stat-card"><div>Analyzed records</div><strong>{analyzed.length}</strong><small>In the latest record window</small></article><article className="panel stat-card"><div>Message groups</div><strong>{clusters.size}</strong><small>Similar message patterns</small></article><article className="panel stat-card"><div>Review candidates</div><strong>{outliers.length}</strong><small>Isolated messages, cluster -1</small></article></div><div className="notice">Analysis is refreshed with Run analysis. TF-IDF / DBSCAN outliers are review candidates; they do not confirm a failure.</div><div className="panel"><div className="panel-heading"><h2>Outlier review queue</h2><span className="badge purple">{outliers.length} records</span></div>{outliers.map(log=><article className="incident-card" key={log._id}><LogBadge log={log}/><strong style={{marginLeft:12,fontSize:12}}>{log.source}</strong><p>{log.message}</p><Link className="text-link" to={`/assistant?source=${encodeURIComponent(log.source)}`}>Investigate source <ArrowUpRight size={16}/></Link></article>)}{!outliers.length&&<div className="empty-state"><Layers3 size={28}/><h2>No outliers to review.</h2><p>Run analysis on at least five received records to find message groups.</p></div>}</div></section>;
 }

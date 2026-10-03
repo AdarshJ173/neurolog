@@ -1,140 +1,17 @@
-import React, { useEffect, useState, useRef } from 'react';
-import axios from '../api';
-import { PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, Legend, XAxis, YAxis } from 'recharts';
-import { Activity, ShieldAlert, BrainCircuit } from 'lucide-react';
-
-const NeuroLogDashboard = () => {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const notified = useRef(new Set());
-
-
-
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await axios.get(`/recent-logs`);
-        const logs = res.data;
-        if ('Notification' in window && Notification.permission === 'granted' && localStorage.getItem('aegis_notifications') === 'true') {
-          const critical = logs.find(log => log.severity_level <= 2 && !notified.current.has(log._id));
-          if (critical) new Notification('NeuroLog critical log', {body: `${critical.source}: ${critical.message}`});
-        }
-        logs.forEach(log => notified.current.add(log._id));
-
-        const criticalCount = logs.filter(log => log.severity_level <= 2).length;
-        const calculatedHealth = Math.max(0, 100 - (criticalCount * 12));
-        const severityCounts = {};
-        logs.forEach(log => {
-            const label = log.severity_label.toUpperCase();
-            severityCounts[label] = (severityCounts[label] || 0) + 1;
-        });
-
-        const colorMap = { "CRITICAL": "#ef4444", "WARNING": "#f59e0b", "INFO": "#10b981", "DEBUG": "#8b5cf6" };
-        const pieData = Object.keys(severityCounts).map(key => ({ name: key, value: severityCounts[key], fill: colorMap[key] || "#3b82f6" }));
-        const areaData = [...logs].reverse().map((log) => ({ time: new Date(log.timestamp).toLocaleTimeString(), severity: log.severity_level, source: log.source }));
-
-        setData({ outliers: logs.filter(log => log.ml_anomaly).length, current_health: calculatedHealth, critical_threats: criticalCount, severity_distribution: pieData, traffic_history: areaData });
-        setLoading(false);
-      } catch { setLoading(false); }
-    };
-
-    fetchData();
-    const uiInterval = setInterval(fetchData, 2000);
-    return () => clearInterval(uiInterval);
-  }, []);
-
-  if (!loading && !data) return <p role="alert">Cannot load logs. Start the backend; this page retries every two seconds.</p>;
-
-  if (loading || !data) return (
-    <div className="animate-in" style={{height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)'}}>
-      <BrainCircuit size={48} color="#3b82f6" style={{ animation: 'pulseGlow 2s infinite', marginBottom: '1rem' }} />
-      <h2>⚡ Loading received logs...</h2>
-    </div>
-  );
-
-  return (
-    <div className="dashboard-container animate-in" style={{ color: 'var(--text-main)', paddingBottom: '2rem' }}>
-      <style>
-        {`
-          @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
-          @keyframes pulseGreen { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
-          .card-alert { border: 2px solid #ef4444 !important; background: rgba(239, 68, 68, 0.1) !important; animation: pulseRed 1s infinite; }
-          .card-recovered { border: 2px solid #10b981 !important; background: rgba(16, 185, 129, 0.1) !important; animation: pulseGreen 1s infinite; }
-          .card-crashed { border: 2px solid #ef4444 !important; background: rgba(0, 0, 0, 0.4) !important; filter: grayscale(1); }
-        `}
-      </style>
-
-      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ margin: 0 }}>System Intelligence</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Real-time Anomaly Detection & Severity Summary</p>
-        </div>
-        <div className="glass-panel" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', color: data.current_health < 60 ? '#ef4444' : '#10b981', border: `1px solid ${data.current_health < 60 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}` }}>
-          <span style={{ background: data.current_health < 60 ? '#ef4444' : '#10b981', width: '8px', height: '8px', borderRadius: '50%', animation: 'pulseGlow 2s infinite' }}></span> POLLING LOGS
-        </div>
-      </header>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        <div className="glass-panel" style={{ padding: '1.5rem', borderLeft: `4px solid ${data.current_health < 60 ? "#ef4444" : "#10b981"}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}><h3 style={{ margin: 0, color: 'var(--text-muted)' }}>Recent-log Health Score</h3><Activity color={data.current_health < 60 ? "#ef4444" : "#10b981"} /></div>
-          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: data.current_health < 60 ? "#ef4444" : "#10b981" }}>{data.current_health}%</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '1.5rem', borderLeft: '4px solid #ef4444' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}><h3 style={{ margin: 0, color: 'var(--text-muted)' }}>Critical Logs</h3><ShieldAlert color="#ef4444" /></div>
-          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#ef4444' }}>{data.critical_threats}</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '1.5rem', borderLeft: '4px solid #8b5cf6' }}>
-          <h3 style={{ margin: 0, color: 'var(--text-muted)' }}>ML Outliers</h3>
-          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#8b5cf6' }}>{data.outliers}</div>
-          <p style={{ color: 'var(--text-muted)' }}>Run clustering to analyze received messages.</p>
-        </div>
-      </div>
-
-      {/* 🚨 THE FIX: Both charts are properly restored in the 1fr 2fr grid! 🚨 */}
-      <div className="dashboard-charts" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
-
-        {/* LEFT CHART: Severity Distribution (Pie) */}
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Severity Distribution</h3>
-          {data.severity_distribution.length === 0 ? (
-              <div style={{ height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>No recent traffic.</div>
-          ) : (
-            <div style={{ width: '100%', height: 250 }}>
-                <ResponsiveContainer>
-                <PieChart>
-                    <Legend />
-                    <Pie data={data.severity_distribution} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
-                    {data.severity_distribution.map((entry, index) => ( <Cell key={`cell-${index}`} fill={entry.fill} /> ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-main)' }} />
-                </PieChart>
-                </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT CHART: Recent Log Severity (Area) */}
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Recent Log Severity</h3>
-          <div style={{ width: '100%', height: 250 }}>
-            <ResponsiveContainer>
-              <AreaChart data={data.traffic_history}>
-                 <XAxis dataKey="time" hide />
-                 <YAxis domain={[0, 7]} allowDecimals={false} stroke="var(--text-muted)" width={25} />
-                 <CartesianGrid strokeDasharray="3 3" stroke="var(--text-muted)" opacity={0.1} vertical={false} />
-                 <Tooltip contentStyle={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-main)' }} />
-                 <Area type="monotone" dataKey="severity" stroke="#3b82f6" fillOpacity={0.2} fill="#3b82f6" strokeWidth={3} isAnimationActive={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-};
-
-export default NeuroLogDashboard;
+import {createElement} from 'react';
+import {useState,useEffect} from 'react';
+import {Link} from 'react-router-dom';
+import {Activity,AlertTriangle,Layers3,Radio,ArrowUpRight} from 'lucide-react';
+import {ResponsiveContainer,BarChart,Bar,XAxis,YAxis,Tooltip,CartesianGrid} from 'recharts';
+import api from '../api';
+import LogBadge from '../components/LogBadge';
+export default function Dashboard(){
+ const [logs,setLogs]=useState([]),[ready,setReady]=useState(false),[online,setOnline]=useState(false);
+ useEffect(()=>{let active=true;async function refresh(){try{const res=await api.get('/recent-logs?limit=300');if(active){setLogs(res.data);setOnline(true);setReady(true);}}catch{if(active)setOnline(false);}}refresh();const timer=setInterval(refresh,3000);return()=>{active=false;clearInterval(timer);};},[]);
+ const errors=logs.filter(l=>l.severity_level<=3),outliers=logs.filter(l=>l.ml_anomaly),sources=[...new Set(logs.map(l=>l.source))],generated=logs.filter(l=>l.message.startsWith('[GENERATED]')).length;
+ const minutes=new Map();[...logs].reverse().forEach(log=>{const time=new Date(log.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});const bucket=minutes.get(time)||{time,routine:0,errors:0};bucket[log.severity_level<=3?'errors':'routine']++;minutes.set(time,bucket);});
+ const stats=[['Recent records',logs.length,Activity,'Latest 300 received entries'],['Errors & critical',errors.length,AlertTriangle,'Includes labeled generated scenarios'],['ML outliers',outliers.length,Layers3,'From the last analysis run'],['Reporting sources',sources.length,Radio,'Sources in this record window']];
+ return <section><div className="page-heading"><div><span className="eyebrow">YOUR OPERATIONS, AT A GLANCE</span><h1>Monitoring overview</h1><p>A clear view of incoming activity and what needs a closer look.</p></div><span className={`badge ${online?'success':'warning'}`}><span className={`status-dot ${online?'':'paused'}`}/>{online?'API connected':'Connecting to API'}</span></div><div className="stats-grid">{stats.map(([label,value,Icon,hint])=><article className="panel stat-card" key={label}><div><span>{label}</span>{createElement(Icon,{size:18})}</div><strong>{ready?value:'—'}</strong><small>{hint}</small></article>)}</div>
+ <div className="overview-grid"><article className="panel"><div className="panel-heading"><div><h2>Incoming activity</h2><p>Records per minute in the current window</p></div><span className="chart-legend"><i/>Routine <i className="red"/>Errors</span></div><div className="chart-container" role="img" aria-label={`Incoming activity: ${logs.length-errors.length} routine records and ${errors.length} error records`}><ResponsiveContainer width="100%" height="100%"><BarChart data={[...minutes.values()].slice(-20)}><CartesianGrid vertical={false} stroke="var(--border)"/><XAxis dataKey="time" stroke="var(--text-muted)" tickLine={false} axisLine={false} fontSize={11}/><YAxis stroke="var(--text-muted)" tickLine={false} axisLine={false} width={30} allowDecimals={false} fontSize={11}/><Tooltip contentStyle={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8}}/><Bar dataKey="routine" name="Routine" stackId="a" fill="#6489eb"/><Bar dataKey="errors" name="Errors" stackId="a" fill="#d96c75" radius={[3,3,0,0]}/></BarChart></ResponsiveContainer></div></article><article className="panel"><div className="panel-heading"><h2>Source activity</h2><Radio size={18}/></div>{sources.length?sources.map(source=>{const count=logs.filter(l=>l.source===source).length;return <div className="source-row" key={source}><div><strong>{source}</strong><span>{count} records</span></div><div className="progress-track"><div style={{width:`${count/Math.max(logs.length,1)*100}%`}}/></div></div>}):<div className="empty-state">Waiting for your first source.</div>}<div className="context-note"><strong>{generated} generated entries</strong><p>Scenario logs are labeled. They do not establish a real service outage.</p></div><a className="text-link" href="http://127.0.0.1:8000" target="_blank" rel="noreferrer">Manage Python log source <ArrowUpRight size={15}/></a></article></div>
+ <article className="panel"><div className="panel-heading"><div><h2>Needs attention</h2><p>Recent error and critical records</p></div><Link className="text-link" to="/explorer?severity=errors">Open log workspace <ArrowUpRight size={16}/></Link></div>{errors.slice(0,5).map(log=><Link className="attention-row" key={log._id} to={`/assistant?source=${encodeURIComponent(log.source)}`}><LogBadge log={log}/><div><strong>{log.source}</strong><p>{log.message}</p></div><span>{new Date(log.timestamp).toLocaleTimeString()}</span><ArrowUpRight size={17}/></Link>)}{!errors.length&&<div className="empty-state">No error or critical records in this window.</div>}</article></section>;
+}

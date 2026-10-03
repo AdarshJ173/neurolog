@@ -201,8 +201,8 @@ def create_app(config=None):
     def chat():
         owner = uid()
         message = text_field(body(), 'message', maximum=4000)
-        records = recent(owner, 100)
-        context = json.dumps([{k: r[k] for k in ('_id', 'timestamp', 'source', 'severity_label', 'message', 'ml_anomaly')} for r in records])
+        records = recent(owner, 300)
+        context = json.dumps([{k: (r[k][:800] if k == 'message' else r[k]) for k in ('_id', 'timestamp', 'source', 'severity_label', 'message', 'ml_anomaly')} for r in records])
         api_key = os.getenv('GROQ_API_KEY')
         if not api_key:
             return jsonify(analyze(records, message))

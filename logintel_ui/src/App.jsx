@@ -1,68 +1,21 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { ExternalLink, Sparkles } from 'lucide-react';
 import api from './api';
-
 import Sidebar from './components/Sidebar';
-const LogIntelDashboard = lazy(() => import('./pages/LogIntelDashboard'));
-const VectorAnalysis = lazy(() => import("./pages/VectorAnalysis"));
-// import VectorAnalysis from './pages/VectorAnalysis';
-const LogExplorer = lazy(() => import('./pages/LogExplorer'));
-const Configuration = lazy(() => import('./pages/Configuration'));
-const AIAssistant = lazy(() => import('./pages/AIAssistant'));
-
 import { ThemeProvider } from './context/ThemeContext';
-
-const AppLayout = () => {
-  const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    const listener = event => setError(event.detail);
-    window.addEventListener('neurolog-error', listener);
-    return () => window.removeEventListener('neurolog-error', listener);
-  }, []);
-  const action = async path => {
-    setBusy(true);
-    setError('');
-    try { const result = await api.post(path); setNotice(result.data.status); }
-    catch { /* The API client displays the error. */ }
-    finally { setBusy(false); }
-  };
-  return (
-    <Router>
-      <div className="animate-in" style={{ minHeight: '100vh', display: 'flex' }}>
-        <Sidebar isCollapsed={isSidebarCollapsed} toggleSidebar={() => setSidebarCollapsed(!isSidebarCollapsed)} />
-        <div className="main-content" style={{ marginLeft: isSidebarCollapsed ? '64px' : '250px', padding: '40px 60px', transition: 'margin-left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)', minHeight: '100vh', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          <div style={{ maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
-            <div className="stream-toolbar glass-panel">
-              <span>Live Log Monitoring</span>
-              <a href="http://127.0.0.1:8000" target="_blank" rel="noopener noreferrer">Open Python application</a>
-              <button disabled={busy} onClick={() => action('/run-ml')}>Run clustering</button>
-            </div>
-            {error && <div role="alert" className="status-message">{error} <button onClick={() => setError('')}>Dismiss</button></div>}
-            {notice && <p role="status">{notice}</p>}
-            <Suspense fallback={<p role="status">Loading page…</p>}><Routes>
-              <Route path="/" element={<Navigate to="/dashboard" />} />
-              <Route path="/dashboard" element={<LogIntelDashboard />} />
-              <Route path="/analysis" element={<VectorAnalysis />} />
-              <Route path="/explorer" element={<LogExplorer />} />
-              <Route path="/assistant" element={<AIAssistant />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/configuration" element={<Configuration />} />
-            </Routes></Suspense>
-          </div>
-        </div>
-      </div>
-    </Router>
-  );
-};
-
-const App = () => (
-  <ThemeProvider>
-    <AppLayout />
-  </ThemeProvider>
-);
-
-export default App;
+const Dashboard=lazy(()=>import('./pages/LogIntelDashboard'));
+const Explorer=lazy(()=>import('./pages/LogExplorer'));
+const Analysis=lazy(()=>import('./pages/VectorAnalysis'));
+const Assistant=lazy(()=>import('./pages/AIAssistant'));
+const Settings=lazy(()=>import('./pages/Configuration'));
+const names={'/dashboard':'Overview','/explorer':'Log workspace','/analysis':'Anomaly analysis','/assistant':'AI investigation','/configuration':'Settings'};
+function Layout(){
+ const [collapsed,setCollapsed]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
+ const location=useLocation();
+ useEffect(()=>{window.scrollTo(0,0);},[location.pathname]);
+ useEffect(()=>{const listener=e=>setError(e.detail);window.addEventListener('neurolog-error',listener);return()=>window.removeEventListener('neurolog-error',listener);},[]);
+ async function analyze(){setBusy(true);try{const result=await api.post('/run-ml');setNotice(result.data.status);}catch{/* shared error */}finally{setBusy(false);}}
+ return <div className={`app-shell ${collapsed?'nav-collapsed':''}`}><a className="skip-link" href="#main">Skip to content</a><Sidebar isCollapsed={collapsed} toggleSidebar={()=>setCollapsed(!collapsed)}/><div className="main-content"><header className="topbar"><div className="breadcrumb">Workspace <span>/</span> <strong>{names[location.pathname]||'Overview'}</strong></div><div className="topbar-actions"><a className="button secondary" href="http://127.0.0.1:8000" target="_blank" rel="noreferrer"><ExternalLink size={16}/> Python app</a><button className="primary" disabled={busy} onClick={analyze}><Sparkles size={16}/>{busy?'Analyzing…':'Run analysis'}</button></div></header><main id="main" className="page-content">{error&&<div role="alert" className="notice error">{error}<button onClick={()=>setError('')}>Dismiss</button></div>}{notice&&<div role="status" className="notice">{notice}<button onClick={()=>setNotice('')}>Dismiss</button></div>}<Suspense fallback={<div className="empty-state">Loading workspace…</div>}><Routes><Route path="/dashboard" element={<Dashboard/>}/><Route path="/explorer" element={<Explorer/>}/><Route path="/analysis" element={<Analysis/>}/><Route path="/assistant" element={<Assistant/>}/><Route path="/configuration" element={<Settings/>}/><Route path="*" element={<Navigate to="/dashboard" replace/>}/></Routes></Suspense></main></div></div>;
+}
+export default function App(){return <ThemeProvider><BrowserRouter><Layout/></BrowserRouter></ThemeProvider>;}
