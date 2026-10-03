@@ -36,9 +36,9 @@ const AppLayout = () => {
         <Sidebar isCollapsed={isSidebarCollapsed} toggleSidebar={() => setSidebarCollapsed(!isSidebarCollapsed)} />
         <div className="main-content" style={{ marginLeft: isSidebarCollapsed ? '64px' : '250px', padding: '40px 60px', transition: 'margin-left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)', minHeight: '100vh', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
-            <div className="demo-toolbar glass-panel">
-              <span>NeuroLog Demo · no account required</span>
-              <button disabled={busy} onClick={() => action('/demo/seed')}>Load sample logs</button>
+            <div className="stream-toolbar glass-panel">
+              <span>Live Log Monitoring</span>
+              <a href="http://127.0.0.1:8000" target="_blank" rel="noopener noreferrer">Open Python application</a>
               <button disabled={busy} onClick={() => action('/run-ml')}>Run clustering</button>
             </div>
             {error && <div role="alert" className="status-message">{error} <button onClick={() => setError('')}>Dismiss</button></div>}

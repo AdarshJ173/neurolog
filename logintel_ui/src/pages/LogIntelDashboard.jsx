@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from '../api';
 import { PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, Legend, XAxis, YAxis } from 'recharts';
-import { Activity, ShieldAlert, BrainCircuit, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Activity, ShieldAlert, BrainCircuit } from 'lucide-react';
 
 const NeuroLogDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const notified = useRef(new Set());
 
-  const [systemState, setSystemState] = useState('stable'); // stable, imminent, crashed, recovered
+
 
 
   useEffect(() => {
@@ -22,8 +22,6 @@ const NeuroLogDashboard = () => {
         }
         logs.forEach(log => notified.current.add(log._id));
 
-        const incident = logs.find(log => /\[ANOMALY PATTERN 8\]|\[SYSTEM HOTFIX\]|MongoTimeoutError/.test(log.message));
-        setSystemState(!incident ? 'stable' : incident.message.includes('[SYSTEM HOTFIX]') ? 'recovered' : incident.message.includes('MongoTimeoutError') ? 'crashed' : 'imminent');
         const criticalCount = logs.filter(log => log.severity_level <= 2).length;
         const calculatedHealth = Math.max(0, 100 - (criticalCount * 12));
         const severityCounts = {};
@@ -36,7 +34,7 @@ const NeuroLogDashboard = () => {
         const pieData = Object.keys(severityCounts).map(key => ({ name: key, value: severityCounts[key], fill: colorMap[key] || "#3b82f6" }));
         const areaData = [...logs].reverse().map((log) => ({ time: new Date(log.timestamp).toLocaleTimeString(), severity: log.severity_level, source: log.source }));
 
-        setData({ current_health: calculatedHealth, critical_threats: criticalCount, severity_distribution: pieData, traffic_history: areaData });
+        setData({ outliers: logs.filter(log => log.ml_anomaly).length, current_health: calculatedHealth, critical_threats: criticalCount, severity_distribution: pieData, traffic_history: areaData });
         setLoading(false);
       } catch { setLoading(false); }
     };
@@ -51,7 +49,7 @@ const NeuroLogDashboard = () => {
   if (loading || !data) return (
     <div className="animate-in" style={{height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)'}}>
       <BrainCircuit size={48} color="#3b82f6" style={{ animation: 'pulseGlow 2s infinite', marginBottom: '1rem' }} />
-      <h2>⚡ Establishing Secure Neural Link...</h2>
+      <h2>⚡ Loading received logs...</h2>
     </div>
   );
 
@@ -84,34 +82,14 @@ const NeuroLogDashboard = () => {
         </div>
 
         <div className="glass-panel" style={{ padding: '1.5rem', borderLeft: '4px solid #ef4444' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}><h3 style={{ margin: 0, color: 'var(--text-muted)' }}>Critical Threats</h3><ShieldAlert color="#ef4444" /></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}><h3 style={{ margin: 0, color: 'var(--text-muted)' }}>Critical Logs</h3><ShieldAlert color="#ef4444" /></div>
           <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#ef4444' }}>{data.critical_threats}</div>
         </div>
 
-        <div className={`glass-panel ${systemState === 'imminent' ? 'card-alert' : systemState === 'recovered' ? 'card-recovered' : systemState === 'crashed' ? 'card-crashed' : ''}`} style={{ padding: '1.5rem', borderLeft: `4px solid ${systemState === 'stable' ? '#8b5cf6' : systemState === 'recovered' ? '#10b981' : '#ef4444'}`, transition: 'all 0.3s ease' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0, color: systemState === 'stable' ? 'var(--text-muted)' : systemState === 'recovered' ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>
-              {systemState === 'stable' ? 'Incident Markers' : systemState === 'imminent' ? 'EWS ALERT' : systemState === 'recovered' ? 'RECOVERY REPORTED' : 'FAILURE REPORTED'}
-            </h3>
-            {systemState === 'stable' && <BrainCircuit color="#8b5cf6" />}
-            {systemState === 'imminent' && <AlertTriangle color="#ef4444" />}
-            {systemState === 'recovered' && <CheckCircle color="#10b981" />}
-            {systemState === 'crashed' && <AlertTriangle color="#ef4444" opacity={0.5} />}
-          </div>
-
-          <div style={{ fontSize: systemState === 'imminent' ? '3rem' : '2.5rem', fontWeight: '900', color: systemState === 'stable' ? '#8b5cf6' : systemState === 'recovered' ? '#10b981' : '#ef4444', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-            {systemState === 'stable' && 'Stable'}
-            {systemState === 'imminent' && 'Warning'}
-            {systemState === 'recovered' && 'HOTFIXED'}
-            {systemState === 'crashed' && 'OFFLINE'}
-          </div>
-
-          <p style={{ color: systemState === 'stable' ? 'var(--text-muted)' : systemState === 'recovered' ? '#10b981' : '#ef4444', fontSize: '0.85rem', margin: '0.5rem 0 0 0', fontWeight: systemState === 'stable' ? 'normal' : 'bold' }}>
-            {systemState === 'stable' && 'No incident markers observed.'}
-            {systemState === 'imminent' && 'Warning marker observed; investigate.'}
-            {systemState === 'recovered' && 'Recovery marker observed in logs.'}
-            {systemState === 'crashed' && 'Failure marker observed in logs.'}
-          </p>
+        <div className="glass-panel" style={{ padding: '1.5rem', borderLeft: '4px solid #8b5cf6' }}>
+          <h3 style={{ margin: 0, color: 'var(--text-muted)' }}>ML Outliers</h3>
+          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#8b5cf6' }}>{data.outliers}</div>
+          <p style={{ color: 'var(--text-muted)' }}>Run clustering to analyze received messages.</p>
         </div>
       </div>
 

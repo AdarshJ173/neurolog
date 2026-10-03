@@ -7,9 +7,9 @@ import ReactMarkdown from 'react-markdown';
 const AIAssistant = () => {
   // 🚨 NEW: Load initial state from localStorage!
   const [messages, setMessages] = useState(() => {
-    const saved = sessionStorage.getItem('neurolog-demo-chat');
+    const saved = sessionStorage.getItem('neurolog-live-chat');
     try { if (saved && Array.isArray(JSON.parse(saved))) return JSON.parse(saved); } catch { /* Ignore corrupt stored history. */ }
-    return [{ sender: 'bot', text: 'NeuroLog AI initialized. Monitoring server streams for malicious activity and critical anomalies.' }];
+    return [{ sender: 'bot', text: 'NeuroLog AI initialized. Ready to investigate received application logs.' }];
   });
 
   const [input, setInput] = useState('');
@@ -24,7 +24,7 @@ const AIAssistant = () => {
 
   // 🚨 NEW: Save chat history to localStorage every time it changes
   useEffect(() => {
-    sessionStorage.setItem('neurolog-demo-chat', JSON.stringify(messages.slice(-100)));
+    sessionStorage.setItem('neurolog-live-chat', JSON.stringify(messages.slice(-100)));
     if (chatBoxRef.current) chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
   }, [messages, isTyping]);
 
@@ -40,26 +40,7 @@ const AIAssistant = () => {
         const threats = res.data.filter(log => log.severity_level <= 3).slice(0, 10);
         setCriticalLogs(threats);
 
-        if (threats.length > 0) {
-            const latestThreat = threats[0];
 
-            // If we have NOT alerted about this specific database object yet
-            if (!notifiedIdsRef.current.has(latestThreat._id)) {
-
-                if (latestThreat.message.includes("MongoTimeoutError")) {
-                    setMessages(prev => [...prev, { sender: 'bot', text: `🚨 **CRITICAL SYSTEM OUTAGE** 🚨\n\nI have intercepted a fatal crash in the \`${latestThreat.source}\`. The cluster is unreachable and OOM protocols were invoked. Verify the service status before taking action.` }]);
-                    notifiedIdsRef.current.add(latestThreat._id);
-                }
-                else if (latestThreat.message.includes("[ANOMALY PATTERN 8]")) {
-                    setMessages(prev => [...prev, { sender: 'bot', text: `⚠️ **PREDICTIVE WARNING** ⚠️\n\nA warning marker was reported in the \`${latestThreat.source}\`. A cascading failure is imminent. Review service memory and connectivity; no failover has been executed.` }]);
-                    notifiedIdsRef.current.add(latestThreat._id);
-                }
-                else if (latestThreat.message.includes("[SYSTEM HOTFIX]")) {
-                    setMessages(prev => [...prev, { sender: 'bot', text: `✅ **CRISIS AVERTED** ✅\n\nA recovery marker was reported. Verify service health before closing the incident.` }]);
-                    notifiedIdsRef.current.add(latestThreat._id);
-                }
-            }
-        }
       } catch (err) { console.error(err); }
     };
 
@@ -107,14 +88,14 @@ const AIAssistant = () => {
         </header>
 
         <div className="glass-panel glass-scroll" style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0 }}>
-          <h3 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', flexShrink: 0 }}><ShieldAlert size={20} /> Active Threat Feed</h3>
-          {criticalLogs.length === 0 ? (<p style={{ color: 'var(--text-muted)' }}>No critical threats detected recently.</p>) : (
+          <h3 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', flexShrink: 0 }}><ShieldAlert size={20} /> Error and Critical Logs</h3>
+          {criticalLogs.length === 0 ? (<p style={{ color: 'var(--text-muted)' }}>No recent error or critical logs.</p>) : (
             criticalLogs.map((log, idx) => (
               <div key={idx} style={{ background: 'rgba(239, 68, 68, 0.1)', borderLeft: '4px solid #ef4444', padding: '1rem', borderRadius: '0 8px 8px 0', flexShrink: 0 }}>
                 <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '0.85rem' }}>[{log.severity_label}] {log.source}</span>
                 <p style={{ margin: '8px 0 12px 0', fontSize: '0.9rem', fontFamily: 'monospace' }}>{log.message}</p>
-                <button onClick={() => handleSend(`Analyze this log and provide a dynamic solution: "${log.message}"`)} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Bot size={14} /> Analyze & Solve
+                <button onClick={() => handleSend(`Investigate this received log: "${log.message}"`)} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Bot size={14} /> Investigate
                 </button>
               </div>
             ))

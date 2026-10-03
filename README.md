@@ -1,42 +1,26 @@
-# NeuroLog AI demo
+# NeuroLog AI
 
-A presentation-ready local demo with no login, account setup, or API-key configuration in the interface.
+Live application logging with a React dashboard, Flask ingestion API, SQLite storage, and TF-IDF/DBSCAN analysis. Opens directly without login on the local machine.
 
-## Start the demo
+## Start
 
-Requires Node.js 22.12+ and Python 3.12. From the project root on Windows:
+Run `powershell -ExecutionPolicy Bypass -File .\start-preview.ps1` from this folder. Python 3.12 and Node.js are required. The launcher installs missing dependencies and starts three background services.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\start-preview.ps1
-```
+- Python task application: http://127.0.0.1:8000
+- NeuroLog dashboard: http://127.0.0.1:5173/dashboard
 
-The launcher installs missing dependencies, starts Flask and Vite as hidden background processes, checks the API, and loads sample records if the database is empty. Both services stay running after the launcher exits.
+Create a task and complete it. The application sends actual task events, request durations/status codes, and measured service heartbeats to NeuroLog. Open Log Explorer to see the `task-service` stream. The dashboard polls every two seconds; Explorer every three seconds. Run clustering to refresh ML analysis.
 
-Open **http://127.0.0.1:5173/dashboard**. Click **Run clustering**, then explore Vector Analysis, Log Explorer, and AI Assistant. Demo Settings contains only appearance and sample-data controls.
+The sender persists events in a SQLite outbox and retries failed delivery. There are no preloaded logs or fabricated incidents. Current received logs use `data/neurolog-live.db`; previous records remain preserved in the older database.
 
-To run the services in visible terminals instead:
+## Documentation
 
-```powershell
-$env:NEUROLOG_DEMO='true'
-.\.venv\Scripts\python.exe LogIntel_engine\api.py
-```
+Read `docs/USER_GUIDE.md` or `output/pdf/NeuroLog_User_Guide.pdf` for architecture, integration, settings, and troubleshooting.
 
-In another terminal, run `npm run dev` inside `logintel_ui`. Keep those terminals open.
+## Validation
 
-## Guide and preview
+Run `.venv/Scripts/python.exe -m pytest -q`. In `logintel_ui`, run `npm run lint` and `npm run build`.
 
-- [Demo guide](docs/USER_GUIDE.md)
-- [Printable PDF](output/pdf/NeuroLog_User_Guide.pdf)
-- [Repair notes](docs/REPAIR_NOTES.md)
+Keep the login-free workspace bound to localhost. Optional Groq configuration enables conversational analysis; otherwise the assistant summarizes actual received records. Clustering flags unusual messages for review and does not prove failure or execute remediation.
 
-![Demo preview](docs/preview.png)
-
-The frontend has no Firebase dependency or authentication routes. The demo runs locally with React, Flask, SQLite, and TF-IDF/DBSCAN. The assistant uses a labeled deterministic local response when no Groq key is configured. It does not execute remediation. The health score is a recent-log heuristic; outliers are review candidates rather than proof of failure.
-
-## Check the code
-
-Run `.\.venv\Scripts\python.exe -m pytest -q` from the root. In `logintel_ui`, run `npm run lint` and `npm run build`. GitHub Actions also checks the optional gateway.
-
-## Attribution
-
-Based on [Sai-Nitin123/Neurolog-AI](https://github.com/Sai-Nitin123/Neurolog-AI), with the original MIT license retained. Original contributors: Sai Nitin, Dhruv Patel, and Manoj Kolapalli.
+Original project: https://github.com/Sai-Nitin123/Neurolog-AI. Original MIT license and contributor attribution retained.

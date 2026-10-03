@@ -5,8 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "simulate": "node traffic_bot.js",
-    "check": "node --check server.js && node --check traffic_bot.js"
+    "check": "node --check server.js"
   },
   "keywords": [],
   "author": "",

@@ -12,7 +12,7 @@ spec.loader.exec_module(api)
 @pytest.fixture
 def app(tmp_path, monkeypatch):
     monkeypatch.delenv('GROQ_API_KEY', raising=False)
-    return api.create_app({'TESTING': True, 'DEMO_MODE': True, 'DATABASE': str(tmp_path / 'test.db')})
+    return api.create_app({'TESTING': True, 'LOCAL_MODE': True, 'DATABASE': str(tmp_path / 'test.db')})
 
 
 def test_ingestion_and_clustering(app):
@@ -46,7 +46,9 @@ def test_invalid_payloads(app, data):
 
 def test_retention_purge_and_persistence(app):
     client = app.test_client()
-    client.post('/api/demo/seed')
+    key = client.post('/api/generate-key', json={}).json['key']
+    for index in range(9):
+        client.post('/api/ingest', json={'message': f'Received request {index}'}, headers={'x-api-key': key})
     assert client.post('/api/settings', json={'retention': 3}).json['retention'] == 3
     with sqlite3.connect(app.config['DATABASE']) as connection:
         connection.execute("UPDATE logs SET timestamp='2000-01-01T00:00:00+00:00' WHERE _id=1")
@@ -69,7 +71,7 @@ def test_ml_empty_vocabulary_and_insufficient_data(app):
 def test_chat_and_bounds(app):
     client = app.test_client()
     assert client.post('/api/chat', json={'message': ''}).status_code == 400
-    assert 'deterministic demo' in client.post('/api/chat', json={'message': 'Explain logs'}).json['reply']
+    assert 'Received-log summary' in client.post('/api/chat', json={'message': 'Explain logs'}).json['reply']
     assert client.get('/api/recent-logs?limit=no').status_code == 400
     assert client.get('/api/recent-logs?limit=1001').status_code == 400
     assert client.post('/api/settings', json={'retention': 99}).status_code == 400
@@ -79,10 +81,9 @@ def test_chat_and_bounds(app):
 def test_production_auth_and_user_isolation(tmp_path):
     import firebase_admin
     from firebase_admin import auth
-    app = api.create_app({'TESTING': True, 'DEMO_MODE': False, 'DATABASE': str(tmp_path / 'auth.db')})
+    app = api.create_app({'TESTING': True, 'LOCAL_MODE': False, 'DATABASE': str(tmp_path / 'auth.db')})
     client = app.test_client()
     assert client.get('/api/recent-logs?uid=victim').status_code == 401
-    assert client.post('/api/demo/seed').status_code == 403
     with patch.object(firebase_admin, 'get_app'), patch.object(auth, 'verify_id_token', side_effect=lambda token, **kw: {'uid': token}):
         user_a = {'Authorization': 'Bearer user-a'}
         user_b = {'Authorization': 'Bearer user-b'}

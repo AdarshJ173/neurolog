@@ -1,4 +1,4 @@
-"""Unified NeuroLog API: local demo storage and verified Firebase authentication."""
+"""Unified NeuroLog API: local workspace storage and verified Firebase authentication."""
 import hashlib
 import json
 import os
@@ -19,8 +19,8 @@ load_dotenv(ROOT / '.env')
 
 def create_app(config=None):
     app = Flask(__name__)
-    app.config.update(DEMO_MODE=os.getenv('NEUROLOG_DEMO', 'true').lower() == 'true',
-                      DATABASE=os.getenv('NEUROLOG_DATABASE', str(ROOT / 'data' / 'neurolog.db')),
+    app.config.update(LOCAL_MODE=os.getenv('NEUROLOG_LOCAL_MODE', 'true').lower() == 'true',
+                      DATABASE=os.getenv('NEUROLOG_DATABASE', str(ROOT / 'data' / 'neurolog-live.db')),
                       MAX_CONTENT_LENGTH=64 * 1024)
     app.config.update(config or {})
     CORS(app, origins=os.getenv('CORS_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').split(','))
@@ -69,8 +69,8 @@ def create_app(config=None):
         return value.strip()
 
     def uid():
-        if app.config['DEMO_MODE']:
-            return 'demo-user'
+        if app.config['LOCAL_MODE']:
+            return 'local-workspace'
         token = request.headers.get('Authorization', '')
         if not token.startswith('Bearer '):
             raise Unauthorized('Sign in to access this workspace.')
@@ -120,7 +120,7 @@ def create_app(config=None):
     @app.get('/api/health')
     def health():
         db().execute('SELECT 1')
-        return jsonify(status='ok', demo=app.config['DEMO_MODE'], storage='sqlite')
+        return jsonify(status='ok', local_mode=app.config['LOCAL_MODE'], storage='sqlite')
 
     @app.get('/api/get-keys')
     def get_keys():
@@ -157,17 +157,6 @@ def create_app(config=None):
         if not 1 <= limit <= 1000:
             raise ValueError('limit must be an integer from 1 to 1000.')
         return jsonify(recent(owner, limit))
-
-    @app.post('/api/demo/seed')
-    def seed():
-        if not app.config['DEMO_MODE']:
-            return jsonify(error='Demo endpoint disabled.'), 403
-        samples = [('web-api', 6, 'Request completed successfully')] * 6 + [
-            ('worker', 4, 'Queue latency above threshold'), ('database', 2, 'Database connection refused'),
-            ('auth-service', 3, 'Repeated authentication failures from unknown address')]
-        for source, level, message in samples:
-            insert_log(uid(), dict(source=source, severity_level=level, message=message))
-        return jsonify(status='Loaded 9 sample logs.')
 
     @app.post('/api/run-ml')
     def run_ml():
@@ -212,10 +201,10 @@ def create_app(config=None):
         context = json.dumps([{k: r[k] for k in ('source', 'severity_label', 'message', 'ml_anomaly')} for r in records])
         api_key = os.getenv('GROQ_API_KEY')
         if not api_key:
-            if not app.config['DEMO_MODE']:
-                return jsonify(error='Configure GROQ_API_KEY to use the AI assistant.'), 503
             threats = [r for r in records if r['severity_level'] <= 3 or r['ml_anomaly']]
-            return jsonify(reply=f'### Local demo advisor\nThis is a deterministic demo response, not an LLM analysis.\n\nFound **{len(threats)}** error or anomaly logs in the latest {len(records)} records.\n\n- Check service connectivity and recent deployments.\n- Review resource usage and authentication failures.\n- Run clustering and compare unusual messages.\n\nNo remediation commands have been executed.')
+            sources = sorted({r['source'] for r in records})
+            findings = '\n'.join(f"- **{r['source']} / {r['severity_label']}**: {r['message'][:300]}" for r in threats[:5])
+            return jsonify(reply=f"### Received-log summary\nLocal analysis of **{len(records)}** recent records from **{len(sources)}** sources. Found **{len(threats)}** error or outlier records.\n\n{findings or 'No error or outlier records in this window.'}\n\nThis summary is calculated from received logs. Configure GROQ_API_KEY for conversational AI analysis. No remediation commands have been executed.")
         try:
             from groq import Groq
             response = Groq(api_key=api_key, timeout=30, max_retries=1).chat.completions.create(

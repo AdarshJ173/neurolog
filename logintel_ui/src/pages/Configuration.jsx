@@ -20,8 +20,8 @@ export default function Configuration() {
     finally { setBusy(false); }
   };
   return <section>
-    <h1>Demo Settings</h1>
-    <p>Change the presentation and load sample data. No accounts or API keys are needed.</p>
+    <h1>Settings</h1>
+    <p>Manage appearance and analyze received application logs.</p>
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,350px),1fr))',gap:24}}>
       <div className="glass-panel" style={{padding:24}}>
         <h2>Appearance</h2>
@@ -39,14 +39,13 @@ export default function Configuration() {
         </div>
       </div>
       <div className="glass-panel" style={{padding:24}}>
-        <h2>Presentation data</h2>
-        <p>Load a sample batch, then run clustering to see unusual messages in Vector Analysis.</p>
+        <h2>Live analysis</h2>
+        <p>Run clustering on received messages and inspect unusual records in Vector Analysis.</p>
         <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-          <button disabled={busy} onClick={()=>run('/demo/seed')} style={buttonStyle}>Load sample logs</button>
           <button disabled={busy} onClick={()=>run('/run-ml')} style={buttonStyle}>Run clustering</button>
         </div>
         {status && <p role="status">{status}</p>}
-        <p>The assistant explains sample logs. It does not execute remediation commands.</p>
+        <p>The advisor summarizes received logs. It does not execute remediation commands.</p>
       </div>
     </div>
   </section>;

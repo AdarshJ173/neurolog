@@ -1,70 +1,81 @@
-# NeuroLog AI: demo guide
+# NeuroLog AI: live logging guide
 
-## 1. Start and open the demo
+## 1. Start both applications
 
-This version opens directly to the dashboard. There is no login, sign-up, sign-out, or account/API-key setup in the interface. No Firebase project or external AI account is required for the presentation.
-
-Install Node.js 22.12 or newer and Python 3.12 for a fresh checkout. The current workspace already has its dependencies installed. Open PowerShell in the project's root and run:
+From the project folder in PowerShell:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\start-preview.ps1
 ```
 
-Open http://127.0.0.1:5173/dashboard. The launcher starts the services as hidden background processes, waits for the API to respond, and loads nine sample records if the database is empty. The services continue running after the launcher exits. Running the launcher again reuses services already listening on the expected ports.
+Python 3.12 and Node.js must be installed. The launcher creates a Python environment, installs missing dependencies, and starts services in the background. Open the task application at http://127.0.0.1:8000 and NeuroLog at http://127.0.0.1:5173/dashboard. No login is required.
 
-If Python is not on PATH, pass its executable path with `-Python`. The launcher checks the installed dependencies and installs them only if missing. The app stores local data in `data/neurolog.db`. Logs for troubleshooting are written under `data/`.
+After changing backend code, restart managed services using the same command with `-Restart`. Services started outside the launcher must be stopped separately if they occupy these ports.
 
-## 2. A short presentation walkthrough
+## 2. Generate real application activity
 
-1. Show **Live Monitor**. It summarizes recent log severity, critical records, and incident markers. Sample data is already present when you use the launcher.
-2. Click **Run clustering**. The actual Python TF-IDF/DBSCAN pipeline analyzes the latest 100 messages. At least five logs are required.
-3. Open **Vector Analysis**. The initial sample batch has six repeated successful requests and three unusual messages. With that batch, the three unusual messages are outliers.
-4. Open **Log Explorer**. Search for `database`, then choose **Errors / critical** to show syslog levels 0 through 3.
-5. Open **AI Assistant**. Ask what to investigate, or choose **Analyze & Solve** next to a sample error. The local advisor returns a clearly labeled deterministic checklist when Groq is not configured.
-6. Open **Demo Settings**. Change the color scheme, background, or visual effects for the presentation. It also has sample-loading and clustering controls.
+1. Enter a task title and click Add task.
+2. Click Complete, or Reopen, on that task.
+3. Open NeuroLog's Log Explorer and look for source `task-service`.
+4. Use search and severity filters to inspect the received events.
+5. Click Run clustering, then open Vector Analysis to inspect message groups and outliers.
 
-Each **Load sample logs** click adds another nine records. Repeated copies of formerly unusual messages can form a cluster, so the number of outliers may change after adding another batch. The interface polls for new logs every two to five seconds.
+Task changes are persisted in SQLite. Each request produces a log containing method, path, status and measured duration. Every five seconds, a heartbeat records measured uptime, request count, tasks, completions and queued events. Healthy activity normally produces INFO logs; genuine rejected requests produce WARNING logs and failures produce ERROR logs. There are no preloaded events or random failures.
 
-## 3. What to explain to your audience
+The dashboard polls every two seconds and Explorer every three seconds, so delivery and display are near real time rather than a push connection. Clustering runs when requested; dashboard updates alone do not retrain it.
 
-NeuroLog demonstrates how application messages can be collected, organized, and investigated. The data flow is:
+## 3. How the connection works
 
-Sample loader -> Flask API -> SQLite -> React dashboard.
+Python application -> logging.Handler -> durable SQLite outbox -> HTTP POST /api/ingest -> NeuroLog SQLite -> dashboard polling.
 
-Run clustering -> latest messages -> TF-IDF vectors -> DBSCAN groups -> saved outlier flags -> Vector Analysis.
+`live_app/app.py` implements the task service. `live_app/log_shipper.py` implements the reusable NeuroLogHandler. A worker sends queued events asynchronously, using an ingestion key obtained automatically from the local API. The key is cached in `data/task-service.key` and excluded from Git.
 
-TF-IDF represents messages by word importance. DBSCAN groups messages close in that numerical space, using `eps=0.5` and `min_samples=2`. Cluster -1 means a message was isolated from a group. An unusual message is a review candidate, not proof of a fault. Repeated failures can form a group, while a harmless unique message can be an outlier.
+The sender removes an event only after a successful response. If NeuroLog is unavailable, it retries with backoff up to 30 seconds. Queued events survive restarts. Delivery is at least once: an interrupted acknowledgment can produce a duplicate. The outbox holds at most 10,000 events; once full it reports the dropped new event to stderr.
 
-The recent-log health score is `max(0, 100 - 12 * critical_log_count)` over the latest 100 records. It is a simple severity heuristic, not a measured uptime percentage. The incident card reflects explicit markers supplied in log text; it does not independently verify remote service status or predict an actual crash.
+Python levels map to syslog severity: CRITICAL=2, ERROR=3, WARNING=4, INFO=6, DEBUG=7. Request headers, query strings and task titles are excluded from routine request logs. Avoid adding credentials or private data to your own log messages.
 
-The repository implements TF-IDF and DBSCAN. It does not contain an XGBoost or HDBSCAN model, a validated 94% accuracy result, or automatic remediation. The advisor never executes commands. Without a Groq key, its response is a deterministic demonstration of the advisory workflow rather than live LLM analysis.
+## 4. Connect another Python application
 
-## 4. Preview recovery and manual startup
+Import the handler from this project, create it once at startup, and attach it to your application's logger:
 
-If the preview becomes unavailable, run `start-preview.ps1` again and refresh the browser. The launcher was added because the earlier terminal-based preview stopped when its terminal processes ended.
+```python
+import logging
+from live_app.log_shipper import NeuroLogHandler
 
-For manual startup, keep two terminals open. In the root:
-
-```powershell
-$env:NEUROLOG_DEMO='true'
-.\.venv\Scripts\python.exe LogIntel_engine\api.py
+handler = NeuroLogHandler(
+    endpoint='http://127.0.0.1:5001/api/ingest',
+    source='my-python-service',
+    spool_path='data/my-service-outbox.db',
+    key_path='data/my-service.key',
+)
+handler.start()
+logger = logging.getLogger('my-python-service')
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
+# In actual application operations:
+logger.info('Order processed order_id=%s', order_id)
+# At shutdown:
+handler.close()
 ```
 
-In the other terminal:
+The `order_id` above comes from your application's real operation. Use a separate source, key file and outbox per application. The sample task service already implements this pattern, so it requires no additional code to run.
 
-```powershell
-cd logintel_ui
-npm run dev
-```
+To run only the task application, activate the project's environment and execute `python -m live_app.app`. It reads NEUROLOG_API_URL and NEUROLOG_INGEST_KEY from environment variables. For a remote endpoint, supply its ingestion key explicitly; automatic key provisioning is restricted to localhost.
 
-The backend listens on 127.0.0.1:5001. Vite listens on 127.0.0.1:5173 and proxies `/api` to the backend. Stop manually launched services with Ctrl+C. For background services, identify the command line in Task Manager and stop the project Vite and Python processes when the presentation is finished.
+## 5. Data and analysis
 
-If startup fails, inspect `data/backend.stderr.log` and `data/frontend.stderr.log`. If a port belongs to a different application, stop that conflicting application before restarting. A backend already running in authenticated mode must be stopped so the launcher can start its local demo mode.
+Received records use `data/neurolog-live.db`; tasks use `data/tasks.db`; undelivered events use `data/task-log-outbox.db`. Older records in `data/neurolog.db` remain preserved but are not loaded into the current workspace. The `data` folder is ignored by Git.
 
-## 5. Files and verification
+TF-IDF transforms received message text into vectors. DBSCAN groups similar vectors and marks noise as candidate outliers. Review unusual messages in context. The health score is a heuristic derived from recent critical logs, not a verified uptime measurement. The task service heartbeat contains actual measured uptime.
 
-`LogIntel_engine/api.py` contains the supported API and clustering logic. `logintel_ui/src/pages` contains the screens. `src/api.js` sends requests through the local proxy. `start-preview.ps1` keeps the demo services running in the background. SQLite persists records between restarts. The legacy MongoDB examples and optional gateway are not required to present this demo.
+Without GROQ_API_KEY, the assistant produces a calculated summary of received logs. With a valid optional Groq key configured for the backend, it requests conversational analysis. It never executes fixes.
 
-Run `.\.venv\Scripts\python.exe -m pytest -q` from the root. In `logintel_ui`, run `npm run lint`, `npm run build`, and `npm audit`. This demo-only update passed lint and build and was checked in the browser without login.
+## 6. Troubleshooting and validation
 
-Keep this demo on the local machine; its UI intentionally has no authentication. Original project: https://github.com/Sai-Nitin123/Neurolog-AI. The original MIT license and contributor attribution are retained.
+If startup fails, inspect `data/backend.stderr.log`, `data/tasks.stderr.log`, and `data/frontend.stderr.log`. A port conflict requires stopping the conflicting service. Do not start multiple task-service processes against the same outbox.
+
+If messages stop appearing, check http://127.0.0.1:5001/api/health and http://127.0.0.1:8000/health. Delivery warnings are written to the task-service stderr log. Restore the backend; the sender retries automatically. After a restart, allow up to 30 seconds for backoff recovery, plus the dashboard polling interval.
+
+Run `.venv/Scripts/python.exe -m pytest -q` for ingestion, isolation, clustering, task operations and queue-recovery checks. Run `npm run lint` and `npm run build` inside `logintel_ui` for frontend validation.
+
+The login-free local workspace binds to localhost. A shared deployment needs proper service hosting and an authenticated interface; do not expose the current local workspace publicly. Original project: https://github.com/Sai-Nitin123/Neurolog-AI; MIT attribution is retained.

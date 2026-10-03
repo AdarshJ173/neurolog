@@ -58,7 +58,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
         {/* NEW AI ASSISTANT TAB */}
         <NavItem to="/assistant" icon={<Bot size={22} />} label="AI Assistant" active={isActive('/assistant')} collapsed={isCollapsed} />
 
-        <NavItem to="/configuration" icon={<Settings size={20} />} label="Demo Settings" active={isActive('/configuration')} collapsed={isCollapsed} />
+        <NavItem to="/configuration" icon={<Settings size={20} />} label="Settings" active={isActive('/configuration')} collapsed={isCollapsed} />
       </nav>
 
       {/* --- FOOTER TOGGLE --- */}
