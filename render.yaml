@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: neurolog-ai
+    runtime: docker
+    plan: free
+    branch: codex/neurolog-fixes
+    healthCheckPath: /api/health
+    envVars:
+      - key: NEUROLOG_LOCAL_MODE
+        value: "true"
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile

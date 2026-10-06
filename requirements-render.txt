@@ -1,0 +1,6 @@
+Flask>=3.1,<4
+flask-cors>=6,<7
+scikit-learn>=1.7,<2
+groq>=1,<2
+python-dotenv>=1,<2
+gunicorn>=23,<24

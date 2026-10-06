@@ -5,7 +5,7 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
-from flask import Flask, g, jsonify, request, send_file
+from flask import Flask, g, jsonify, request
 from werkzeug.exceptions import HTTPException
 from live_app.log_shipper import NeuroLogHandler
 from live_app.generator import LogGenerator
@@ -69,7 +69,10 @@ def create_app(config=None, log_handler=None):
 
     @app.get('/')
     def index():
-        return send_file(Path(__file__).with_name('index.html'))
+        from flask import Response
+        content = Path(__file__).with_name('index.html').read_text(encoding='utf-8')
+        content = content.replace('http://127.0.0.1:5173/dashboard', app.config.get('DASHBOARD_URL', 'http://127.0.0.1:5173/dashboard'))
+        return Response(content, mimetype='text/html')
 
     @app.get('/health')
     def health():
