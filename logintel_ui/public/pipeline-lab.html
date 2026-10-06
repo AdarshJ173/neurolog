@@ -2197,7 +2197,11 @@
         }
       }
     </style>
-  </head>
+  <style>
+:root{--bg:#f5f7f5;--panel:#fff;--panel-alt:#f0f4f1;--panel-alt2:#e6eee8;--border:#dfe6e1;--border-bright:#becbc0;--text:#233b35;--muted:#62716b;--cyan:#286b56;--cyan-dim:#edf5ee;--rose:#a44735;--rose-dim:#fbede8;--amber:#8a651e;--amber-dim:#f9f2df;--indigo:#5f6b95;--indigo-dim:#eef0f9;color-scheme:light}
+[data-theme=dark]{--bg:#14211c;--panel:#1d2b24;--panel-alt:#26362e;--panel-alt2:#31473a;--border:#35493e;--border-bright:#5b7460;--text:#edf4ef;--muted:#acbdb1;--cyan:#9eceaf;--cyan-dim:#263f30;--rose:#efb29f;--rose-dim:#432d26;--amber:#e6c483;--amber-dim:#3c3424;--indigo:#b8c4ed;--indigo-dim:#30394c;color-scheme:dark}
+body,button,input,select,textarea{font-family:'Segoe UI',system-ui,sans-serif}h1,h2,h3,.disp{font-family:'Segoe UI',system-ui,sans-serif}.mono,.btn,.badge,.speedgrp button,.stat .num,.panel h3,.rail-label .qc,.trace-id,.tag,.stepstatus,.coworker-chip{font-family:'Segoe UI',system-ui,sans-serif}.wrap{max-width:1320px;padding:0 28px}nav{padding:22px 0}.brand{font-size:19px;font-weight:600}.brand .dot{background:var(--cyan);border-radius:6px;width:22px;height:22px}.badge{font-size:9px;border-radius:6px;padding:5px 8px}.badge:before{animation:none}header.hero{padding:28px 0 0}.eyebrow{font-size:9px;letter-spacing:1.4px;color:var(--muted)}h1.headline{font-size:29px;font-weight:600;letter-spacing:-1px}.sub{font-size:12px;max-width:730px}.scanline{display:none}.controlbar{border-radius:12px;padding:14px 16px;box-shadow:none;gap:9px;margin:24px 0}.btn{font-size:11px;min-height:40px;border-radius:8px;padding:9px 13px}.btn:hover{transform:none}.btn.primary{background:var(--cyan);color:var(--panel);border-color:var(--cyan)}.btn.surge{color:var(--amber);background:var(--amber-dim);border-color:var(--border)}.btn.surge.active{box-shadow:none}.speedgrp{border-radius:8px}.speedgrp button{font-size:10px;min-height:32px}.concurrency-control .cc-label,.livestat{font-size:10px}.stats{gap:14px}.stat{padding:20px;border-radius:12px}.stat:after{display:none}.stat .num{font-size:28px;font-weight:500}.stat .lbl{font-size:10px}.maingrid{grid-template-columns:290px minmax(0,1fr);gap:20px}.panel{box-shadow:none;border-radius:14px;padding:22px}.panel h3{font-size:10px;letter-spacing:.8px}.rail-label{font-size:12px}.rail-desc{font-size:10px;line-height:1.7}.rail-dot{width:12px;height:12px}.rail-node.active .rail-dot{box-shadow:none}.stepcard{border-radius:10px;background:var(--panel-alt);padding:16px}.stepcard.active{box-shadow:none;border-color:var(--cyan)}.stepcard-title{font-size:12px}.stepstatus{font-size:9px}.stepbody{font-size:12px;line-height:1.9}.trace-head{padding:16px;border-radius:10px}.trace-msg{font-size:13px;font-weight:500}.tag{font-size:9px;border-radius:5px;padding:4px 7px}.livestat{padding:7px 9px;border-radius:7px}.stat .num.bump{animation:none}.diff-card,.insight-card{border-radius:12px;box-shadow:none}.diff-card:hover{transform:none}.diff-title,.section-title h2{font-size:23px;font-weight:600;letter-spacing:-.7px}.diff-text,.section-subtitle{font-size:12px}.ledger-search,.ledger-select{min-height:40px;border-radius:8px;font-size:11px}table th{font-size:9px;letter-spacing:.8px}table td{font-size:11px}.btn-sm{min-height:36px;font-size:10px;border-radius:7px}.modal-overlay{backdrop-filter:none}.modal-content{background:var(--panel);border:1px solid var(--border);border-radius:16px}.modal-content h2{font-size:22px}.toast{border-radius:10px;background:var(--panel);box-shadow:0 4px 24px #16321f20}.t-body{font-size:11px}.t-head{font-size:12px}.legend-item{font-size:10px}.coworkers-strip{border-radius:10px}.coworker-chip{font-size:10px;min-height:32px}.embedding,.embedmap-wrap{border-radius:14px}.footer{font-size:10px}@media(max-width:760px){.wrap{padding:0 16px}nav{gap:12px;flex-wrap:wrap}.badge{font-size:8px}.maingrid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}h1.headline{font-size:25px}.controlbar{align-items:flex-start}.controlbar .spacer{display:none}.controlbar .speedgrp{flex-wrap:wrap}.stat{padding:16px}.stat .num{font-size:25px}.panel{padding:18px}.trace-head{flex-wrap:wrap}.ledger-toolbar{flex-wrap:wrap}.embedmap-wrap{overflow:hidden}.diff-grid{grid-template-columns:1fr}.modal-content{max-width:calc(100vw - 24px)}table{min-width:650px}.ledger-table-wrap{overflow:auto}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+</style></head>
   <body>
     <div class="wrap">
       <nav>
@@ -2213,16 +2217,16 @@
             id="openRulesBtn"
             style="padding: 8px 14px; font-size: 12px"
           >
-            ⚡ Alert Rules (<span id="ruleCount">1</span>)
+             Alert Rules (<span id="ruleCount">1</span>)
           </button>
-          <div class="badge">Pipeline Simulator · HDBSCAN + LLaMA 3</div>
+          <div class="badge">PIPELINE LAB · SYNTHETIC WORKFLOW</div>
         </div>
       </nav>
 
       <header class="hero">
         <div class="eyebrow">Interactive Observability Walkthrough</div>
         <h1 class="headline">
-          Watch individual log streams walk through the full analytics pipeline
+          One record. Six stages. A clearer understanding.
         </h1>
         <p class="sub">
           Each record moves through all six microservice stages — ingestion,
@@ -2243,7 +2247,7 @@
         >
           ⏭ Process All
         </button>
-        <button class="btn surge" id="surgeBtn">⚡ Traffic Surge (1x)</button>
+        <button class="btn surge" id="surgeBtn"> Traffic Surge (1x)</button>
         <button class="btn" id="resetBtn">↺ Reset</button>
         <div class="speedgrp" id="speedGrp">
           <button data-ms="1600" class="active">1×</button>
@@ -2303,7 +2307,7 @@
             <div id="queuePreview"></div>
           </div>
           <div class="watchlist">
-            <h4>🤖 AI pattern watch</h4>
+            <h4> AI pattern watch</h4>
             <div id="watchlistBody"></div>
           </div>
         </div>
@@ -2331,7 +2335,7 @@
           <div class="diff-card" style="--accent: var(--cyan)">
             <div class="diff-index">01</div>
             <div class="diff-card-head">
-              <span class="diff-icon">🎯</span>
+              <span class="diff-icon"></span>
               <div>
                 <h4>Alert Fatigue → Correlated Incidents</h4>
                 <p>One root cause shouldn't page anyone fifty times.</p>
@@ -2360,7 +2364,7 @@
               </div>
             </div>
             <div class="diff-stat">
-              <span class="diff-stat-icon">🔔</span>
+              <span class="diff-stat-icon"></span>
               <span class="diff-stat-num legacy" id="diffAlerts1">0</span>
               <span class="diff-stat-sep">alerts</span>
               <span class="diff-stat-arrow">→</span>
@@ -2372,7 +2376,7 @@
           <div class="diff-card" style="--accent: var(--amber)">
             <div class="diff-index">02</div>
             <div class="diff-card-head">
-              <span class="diff-icon">🔁</span>
+              <span class="diff-icon"></span>
               <div>
                 <h4>Isolated Events → Pattern Detection</h4>
                 <p>Context across time is where real incidents hide.</p>
@@ -2401,7 +2405,7 @@
               </div>
             </div>
             <div class="diff-stat">
-              <span class="diff-stat-icon">👁</span>
+              <span class="diff-stat-icon"></span>
               <span class="diff-stat-num ai" id="diffPatternCount">0</span>
               <span class="diff-stat-sep"
                 >repeat-offender patterns currently being tracked</span
@@ -2412,7 +2416,7 @@
           <div class="diff-card" style="--accent: var(--indigo)">
             <div class="diff-index">03</div>
             <div class="diff-card-head">
-              <span class="diff-icon">📊</span>
+              <span class="diff-icon"></span>
               <div>
                 <h4>Keyword Matching → Risk Scoring</h4>
                 <p>Not every error deserves the same response.</p>
@@ -2440,7 +2444,7 @@
               </div>
             </div>
             <div class="diff-stat">
-              <span class="diff-stat-icon">⚖</span>
+              <span class="diff-stat-icon"></span>
               <span class="diff-stat-num ai" id="diffSuppressRate">0%</span>
               <span class="diff-stat-sep"
                 >of error-pattern logs scored low-risk and silently
@@ -2452,7 +2456,7 @@
           <div class="diff-card" style="--accent: var(--cyan)">
             <div class="diff-index">04</div>
             <div class="diff-card-head">
-              <span class="diff-icon">🤖</span>
+              <span class="diff-icon"></span>
               <div>
                 <h4>Raw Text → Root Cause Explanation</h4>
                 <p>A log line tells you what happened. Not why.</p>
@@ -2480,7 +2484,7 @@
               </div>
             </div>
             <div class="diff-stat">
-              <span class="diff-stat-icon">💡</span>
+              <span class="diff-stat-icon"></span>
               <span class="diff-stat-num ai" id="diffExplainCount">0</span>
               <span class="diff-stat-sep"
                 >root-cause explanations generated with suggested actions</span
@@ -2738,7 +2742,7 @@
     <div id="toastStack"></div>
 
     <div style="position:fixed;bottom:0;left:0;right:0;z-index:999;background:#232327;color:#fff;padding:12px 24px;font:14px/1.5 system-ui" role="note">Pipeline Lab · Synthetic, browser-local simulation. Scores, queue latency and dispatches are illustrations. <a href="/incidents" style="color:#dcee9a">Open live investigations</a></div>
-    <script>
+    <script>window.addEventListener('message',function(event){if(event.source===parent&&event.data?.type==='neurolog-theme'&&['light','dark'].includes(event.data.theme))document.documentElement.dataset.theme=event.data.theme;});</script><script>
       /* ---------- Config & State ---------- */
       const STAGES = [
         {
@@ -3031,7 +3035,7 @@
                   : "severity-low";
             const noiseReductionBadge =
               ins.grouped > 0
-                ? `<div style="margin-top:12px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--cyan); background:var(--cyan-dim); border:1px solid rgba(13,148,136,0.3); padding:4px 8px; border-radius:6px; display:inline-block;">⚡ Grouped ${ins.grouped} redundant logs</div>`
+                ? `<div style="margin-top:12px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--cyan); background:var(--cyan-dim); border:1px solid rgba(13,148,136,0.3); padding:4px 8px; border-radius:6px; display:inline-block;"> Grouped ${ins.grouped} redundant logs</div>`
                 : "";
 
             return `<div class="insight-card ${sevClass}">
@@ -3768,7 +3772,7 @@
 
       function showWebhookAlert(item, rule) {
         showToastMsg(
-          `⚡ Rule Triggered: ${rule.actionText}`,
+          ` Rule Triggered: ${rule.actionText}`,
           `Matched <b>${rule.condText}</b> on log #${item.id} (${item.service}). Payload preview only; no external delivery.`,
           "#D97706",
         );
@@ -3824,7 +3828,7 @@
             return `<div class="wl-row" onclick="openUserHistory('${r.identifier}')" title="Click to see ${r.identifier}'s full timeline">
       <span class="wl-dot" style="background:${c.color}"></span>
       <span class="wl-id">${r.identifier}</span>
-      <span class="wl-count ${flagged ? "flagged" : ""}">${r.count}× ${flagged ? "⚠" : ""}</span>
+      <span class="wl-count ${flagged ? "flagged" : ""}">${r.count}× ${flagged ? "" : ""}</span>
       <span class="wl-arrow">›</span>
     </div>`;
           })
@@ -3905,7 +3909,7 @@
             : "";
         let head = `
     <div class="replay-banner">
-      <span>🔁 Replaying <b>log #${item.id}</b> · ${item.time} — historical run from ledger.</span>
+      <span> Replaying <b>log #${item.id}</b> · ${item.time} — historical run from ledger.</span>
       <button class="btn-sm" id="backToLiveBtn">↺ Back to live</button>
     </div>
     <div class="trace-head">
@@ -3931,7 +3935,7 @@
             item.clusterId === "ok" &&
             (s.key === "score" || s.key === "explain")
           ) {
-            statusLabel = "bypassed ⚡";
+            statusLabel = "bypassed ";
             bodyHtml = `<div class="stepbody" style="color:var(--cyan); font-style:italic;">Safe log detected. Heavy computation bypassed to save resources.</div>`;
           } else if (s.key === "ingest") {
             const d = item.derived.ingest || {
@@ -3984,7 +3988,7 @@
             const text = PERSONA_TEMPLATES[llmPersona](item, built);
             const headlineHtml =
               d && d.headline
-                ? `<div class="ai-headline ${d.escalated ? "escalated" : ""}">${d.escalated ? "🚨" : "🤖"} ${d.headline}</div>`
+                ? `<div class="ai-headline ${d.escalated ? "escalated" : ""}">${d.escalated ? "" : ""} ${d.headline}</div>`
                 : "";
             const personaBox = `<div class="prompt-box"><label>LLM Persona Prompt Engine</label><select class="persona-select" data-id="${item.id}"><option value="sre" ${llmPersona === "sre" ? "selected" : ""}>SRE Incident Commander</option><option value="junior" ${llmPersona === "junior" ? "selected" : ""}>Junior Dev Post-Mortem</option><option value="json" ${llmPersona === "json" ? "selected" : ""}>Structured JSON Payload</option></select></div>`;
             const tuneBtn = `<button class="btn-sm" style="margin-top:10px; font-size:11px;" onclick="markFalsePositive(${item.id})">❌ Mark as False Positive (Tune Model)</button>`;
@@ -3993,7 +3997,7 @@
               d.suggestions &&
               d.suggestions.length &&
               llmPersona !== "json"
-                ? `<div class="ai-suggest-head" style="opacity:1; animation:none;">🤖 AI suggested actions</div><ul class="ai-suggest-list" style="opacity:1; animation:none;">${d.suggestions.map((s) => `<li>${s}</li>`).join("")}</ul>`
+                ? `<div class="ai-suggest-head" style="opacity:1; animation:none;"> AI suggested actions</div><ul class="ai-suggest-list" style="opacity:1; animation:none;">${d.suggestions.map((s) => `<li>${s}</li>`).join("")}</ul>`
                 : "";
             bodyHtml = `${headlineHtml}<div class="stepbody" style="${llmPersona === "json" ? "font-family:JetBrains Mono,monospace; white-space:pre-wrap;" : ""}">${text}</div>${sugHtml}${tuneBtn}${personaBox}`;
           } else if (s.key === "visualize") {
@@ -4107,7 +4111,7 @@
             item.clusterId === "ok" &&
             (s.key === "score" || s.key === "explain")
           ) {
-            statusLabel = "bypassed ⚡";
+            statusLabel = "bypassed ";
             bodyHtml = `<div class="stepbody" style="color:var(--cyan); font-style:italic;">Safe log detected. Heavy computation bypassed to save resources.</div>`;
           } else if (status === "pending") {
             bodyHtml = `<div class="stepbody" style="color:var(--muted);">Waiting…</div>`;
@@ -4160,7 +4164,7 @@
             const text = PERSONA_TEMPLATES[llmPersona](item, built);
             const headlineHtml =
               d && d.headline
-                ? `<div class="ai-headline ${d.escalated ? "escalated" : ""}">${d.escalated ? "🚨" : "🤖"} ${d.headline}</div>`
+                ? `<div class="ai-headline ${d.escalated ? "escalated" : ""}">${d.escalated ? "" : ""} ${d.headline}</div>`
                 : "";
             const personaBox = `<div class="prompt-box"><label>LLM Persona Prompt Engine</label><select class="persona-select"><option value="sre" ${llmPersona === "sre" ? "selected" : ""}>SRE Incident Commander</option><option value="junior" ${llmPersona === "junior" ? "selected" : ""}>Junior Dev Post-Mortem</option><option value="json" ${llmPersona === "json" ? "selected" : ""}>Structured JSON Payload</option></select></div>`;
             const tuneBtn = `<button class="btn-sm" style="margin-top:10px; font-size:11px;" onclick="markFalsePositive(${item.id})">❌ Mark as False Positive (Tune Model)</button>`;
@@ -4168,7 +4172,7 @@
             if (status === "done") {
               const sugHtml =
                 d.suggestions && d.suggestions.length && llmPersona !== "json"
-                  ? `<div class="ai-suggest-head" style="opacity:1; animation:none;">🤖 AI suggested actions</div><ul class="ai-suggest-list" style="opacity:1; animation:none;">${d.suggestions.map((s) => `<li>${s}</li>`).join("")}</ul>`
+                  ? `<div class="ai-suggest-head" style="opacity:1; animation:none;"> AI suggested actions</div><ul class="ai-suggest-list" style="opacity:1; animation:none;">${d.suggestions.map((s) => `<li>${s}</li>`).join("")}</ul>`
                   : "";
               bodyHtml = `${headlineHtml}<div class="stepbody" style="${llmPersona === "json" ? "font-family:JetBrains Mono,monospace; white-space:pre-wrap;" : ""}">${text}</div>${sugHtml}${tuneBtn}${personaBox}`;
             } else {
@@ -4306,7 +4310,7 @@
             // Generates the badge to prove the AI reduced the noise
             const groupBadge =
               r.isGrouped && r.count > 1
-                ? `<span style="margin-left:8px; font-family:'JetBrains Mono',monospace; font-size:10px; background:var(--cyan-dim); color:var(--cyan); border:1px solid rgba(13,148,136,0.3); padding:2px 6px; border-radius:4px; font-weight:600;">⚡ Grouped ${r.count} events</span>`
+                ? `<span style="margin-left:8px; font-family:'JetBrains Mono',monospace; font-size:10px; background:var(--cyan-dim); color:var(--cyan); border:1px solid rgba(13,148,136,0.3); padding:2px 6px; border-radius:4px; font-weight:600;"> Grouped ${r.count} events</span>`
                 : "";
 
             return `<tr class="clickable ${idx === 0 && !ledgerFilterText ? "newrow" : ""} ${isReplaying ? "replaying" : ""}" data-id="${r.id}">
@@ -4423,8 +4427,8 @@
         el.className = "toast";
         el.style.borderLeftColor = escalated ? "#E11D48" : cluster.color;
         const title = escalated
-          ? `🚨 ${d.headline}`
-          : `⚠ High risk · ${cluster.name}`;
+          ? ` ${d.headline}`
+          : ` High risk · ${cluster.name}`;
         const body = escalated
           ? `<b class="mono">${item.identifier}</b> on <b class="mono">${item.service}</b> — ${item.derived.pattern.count}× in the last few minutes. Score ${item.score}.`
           : `<b class="mono">${item.service}</b> scored <b>${item.score}</b> — explanation sent to dashboard.`;
@@ -4606,8 +4610,8 @@
           surgeActive = !surgeActive;
           this.classList.toggle("active", surgeActive);
           this.textContent = surgeActive
-            ? "⚡ Surge Active (5x)"
-            : "⚡ Traffic Surge (1x)";
+            ? " Surge Active (5x)"
+            : " Traffic Surge (1x)";
           evaluateSystemInsights();
         });
 
@@ -4681,7 +4685,7 @@
         aiIncidentGroups.clear();
         document.getElementById("surgeBtn").classList.remove("active");
         document.getElementById("surgeBtn").textContent =
-          "⚡ Traffic Surge (1x)";
+          " Traffic Surge (1x)";
         totalClusterCounts.db = 0;
         totalClusterCounts.auth = 0;
         totalClusterCounts.net = 0;
