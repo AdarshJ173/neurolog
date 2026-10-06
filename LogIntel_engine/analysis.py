@@ -16,6 +16,39 @@ RULES = [
 ]
 
 
+def normalize_message(message):
+    """Ignore changing measurements/IDs so repeated events remain one pattern."""
+    message = re.sub(r'^\[GENERATED\]\s*', '', message)
+    message = re.sub(r'\b[0-9a-f]{8}-[0-9a-f-]{27,}\b', '<id>', message, flags=re.I)
+    message = re.sub(r'\b\d+(?:\.\d+)?\b', '<n>', message)
+    return message.strip()
+
+
+def detect_patterns(records):
+    groups = {}
+    for record in records:
+        template = normalize_message(record['message'])
+        generated = record['message'].startswith('[GENERATED]')
+        key = (record['source'], generated, record['severity_label'], template)
+        group = groups.setdefault(key, dict(template=template, source=record['source'],
+            generated=generated, severity=record['severity_label'], count=0,
+            first_seen=record['timestamp'], last_seen=record['timestamp'], evidence=[]))
+        group['count'] += 1
+        group['first_seen'] = min(group['first_seen'], record['timestamp'])
+        group['last_seen'] = max(group['last_seen'], record['timestamp'])
+        if len(group['evidence']) < 3:
+            group['evidence'].append(record['_id'])
+    patterns = sorted((g for g in groups.values() if g['count'] >= 2),
+                      key=lambda g: g['count'], reverse=True)
+    for pattern in patterns:
+        rule = next((r for r in RULES if any(t in pattern['template'].lower() for t in r[1])), None)
+        pattern['next_step'] = rule[3] if rule else 'Compare this repeated event with request volume and recent changes.'
+        pattern['share_percent'] = round(pattern['count'] / max(len(records), 1) * 100, 1)
+    return dict(records=len(records), patterns=patterns,
+                repeated_records=sum(p['count'] for p in patterns),
+                error_records=sum(r['severity_level'] <= 3 for r in records))
+
+
 def analyze(records, question):
     focused = records
     # Explicit source selection is deterministic and avoids inventing relevance.
@@ -51,5 +84,8 @@ def analyze(records, question):
         lines.append('No warnings, errors, or stored ML outliers in the selected window.')
     if 'anomal' in question.lower() or 'cluster' in question.lower():
         lines.append('ML outliers are results of the last clustering run. Run clustering to refresh them; an outlier is not proof of failure.')
+    patterns = detect_patterns(focused)
+    for pattern in patterns['patterns'][:5]:
+        lines.append(f"Repeated pattern: **{pattern['count']} occurrences** on {pattern['source']}: {pattern['template']} (evidence IDs {pattern['evidence']}).")
     lines.append('\nNo remediation commands have been executed. Use source:name to narrow the investigation.')
-    return dict(reply='\n\n'.join(lines), mode='local', summary=summary, findings=findings)
+    return dict(reply='\n\n'.join(lines), mode='local', summary=summary, findings=findings, patterns=patterns['patterns'])

@@ -5,8 +5,8 @@ const items=[['/dashboard',Activity,'Overview'],['/explorer',Search,'Log workspa
 export default function Sidebar({isCollapsed,toggleSidebar}) {
   return <aside className={`sidebar ${isCollapsed?'collapsed':''}`}>
     <a className="brand" href="/dashboard"><span className="brand-mark"><AudioLines size={24}/></span><span>NeuroLog<span className="brand-caption">OBSERVABILITY</span></span></a>
-    <div className="workspace-label">Workspace <span>LOCAL</span></div>
+    <div className="workspace-label">Workspace <span>LIVE</span></div>
     <nav aria-label="Main navigation">{items.map(([to,Icon,label])=><NavLink key={to} to={to} title={label} aria-label={label} className={({isActive})=>`nav-item ${isActive?'active':''}`}>{createElement(Icon,{size:19})}<span>{label}</span></NavLink>)}</nav>
-    <div className="sidebar-bottom"><div className="workspace-note"><span className="status-dot"/> Local workspace<p>Python → NeuroLog</p></div><button className="collapse-button" aria-label="Toggle sidebar" onClick={toggleSidebar}>{isCollapsed?<PanelLeftOpen size={18}/>:<PanelLeftClose size={18}/>}<span>Collapse navigation</span></button></div>
+    <div className="sidebar-bottom"><div className="workspace-note"><span className="status-dot"/> Connected workspace<p>Python → NeuroLog</p></div><button className="collapse-button" aria-label="Toggle sidebar" onClick={toggleSidebar}>{isCollapsed?<PanelLeftOpen size={18}/>:<PanelLeftClose size={18}/>}<span>Collapse navigation</span></button></div>
   </aside>;
 }

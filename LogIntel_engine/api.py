@@ -13,9 +13,9 @@ from werkzeug.exceptions import HTTPException, Unauthorized
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import DBSCAN
 try:
-    from LogIntel_engine.analysis import analyze
+    from LogIntel_engine.analysis import analyze, detect_patterns, normalize_message
 except ImportError:
-    from analysis import analyze
+    from analysis import analyze, detect_patterns, normalize_message
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / '.env')
@@ -162,6 +162,10 @@ def create_app(config=None):
             raise ValueError('limit must be an integer from 1 to 1000.')
         return jsonify(recent(owner, limit))
 
+    @app.get('/api/patterns')
+    def patterns():
+        return jsonify(detect_patterns(recent(uid(), 300)))
+
     @app.post('/api/run-ml')
     def run_ml():
         owner = uid()
@@ -169,7 +173,8 @@ def create_app(config=None):
         if len(records) < 5:
             return jsonify(status='At least 5 logs are needed for clustering.', anomalies_detected=0)
         try:
-            vectors = TfidfVectorizer(stop_words='english', max_features=5000).fit_transform([r['message'] for r in records])
+            vectors = TfidfVectorizer(stop_words='english', max_features=5000).fit_transform([
+                normalize_message(r['message']) for r in records])
         except ValueError:
             return jsonify(status='No usable words for vectorization.', anomalies_detected=0)
         clusters = DBSCAN(eps=0.5, min_samples=2).fit_predict(vectors)

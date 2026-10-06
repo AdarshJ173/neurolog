@@ -41,7 +41,10 @@ class LogGenerator:
             with self.lock:
                 if self.generated >= self.limit:
                     return
-            level, pattern = random.choices(patterns, weights=[40, 25, 15, 10, 8, 2])[0]
+            # Recurring incident bursts make small runs useful for pattern analysis.
+            # Every six-entry cycle includes routine activity, warnings and errors.
+            cycle = [0, 3, 3, 2, 4, 4, 1, 0, 5, 0]
+            level, pattern = patterns[cycle[self.generated % len(cycle)]]
             self.logger.log(level, '[GENERATED] ' + pattern, random.randint(1, 5000))
             with self.lock:
                 self.generated += 1
