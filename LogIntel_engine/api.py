@@ -63,7 +63,13 @@ def create_app(config=None):
         for column in ('entity_id', 'trace_id'):
             if column not in columns:
                 db().execute(f'ALTER TABLE logs ADD COLUMN {column} TEXT')
+        rule_columns = {r['name'] for r in db().execute('PRAGMA table_info(alert_rules)')}
+        if 'source' not in rule_columns:
+            db().execute("ALTER TABLE alert_rules ADD COLUMN source TEXT NOT NULL DEFAULT ''")
         db().commit()
+
+    def scope():
+        return request.args.get('source', '').strip()
 
     def now():
         return datetime.now(timezone.utc).isoformat()
@@ -102,8 +108,10 @@ def create_app(config=None):
         cutoff = (datetime.now(timezone.utc) - timedelta(days=settings['retention'] if settings else 14)).isoformat()
         db().execute('DELETE FROM logs WHERE uid=? AND timestamp<?', (owner, cutoff))
         db().commit()
-        return [dict(row) for row in db().execute(
-            'SELECT * FROM logs WHERE uid=? ORDER BY timestamp DESC, _id DESC LIMIT ?', (owner, limit))]
+        source = scope()
+        query = 'SELECT * FROM logs WHERE uid=?' + (' AND source=?' if source else '') + ' ORDER BY timestamp DESC, _id DESC LIMIT ?'
+        values = (owner, source, limit) if source else (owner, limit)
+        return [dict(row) for row in db().execute(query, values)]
 
     def insert_log(owner, data):
         message = text_field(data, 'message')
@@ -198,7 +206,7 @@ def create_app(config=None):
         owner = uid()
         return jsonify(investigate(recent(owner, 300),
             [r['signature'] for r in db().execute('SELECT signature FROM suppressions WHERE uid=?', (owner,))],
-            [dict(r) for r in db().execute('SELECT id,condition,action FROM alert_rules WHERE uid=?', (owner,))]))
+            [dict(r) for r in db().execute('SELECT id,condition,action FROM alert_rules WHERE uid=? AND source=?', (owner, scope()))]))
 
     @app.get('/api/vector-space')
     def vectors():
@@ -221,13 +229,13 @@ def create_app(config=None):
                 raise ValueError('Choose a supported alert action.')
             if db().execute('SELECT COUNT(*) FROM alert_rules WHERE uid=?', (owner,)).fetchone()[0] >= 20:
                 raise ValueError('At most 20 alert rules per workspace.')
-            db().execute('INSERT INTO alert_rules(uid,condition,action) VALUES(?,?,?)', (owner, data['condition'], data['action']))
+            db().execute('INSERT INTO alert_rules(uid,condition,action,source) VALUES(?,?,?,?)', (owner, data['condition'], data['action'], scope()))
             db().commit()
-        return jsonify([dict(r) for r in db().execute('SELECT id,condition,action FROM alert_rules WHERE uid=?', (owner,))])
+        return jsonify([dict(r) for r in db().execute('SELECT id,condition,action FROM alert_rules WHERE uid=? AND source=?', (owner, scope()))])
 
     @app.delete('/api/alert-rules/<int:rule_id>')
     def remove_rule(rule_id):
-        db().execute('DELETE FROM alert_rules WHERE uid=? AND id=?', (uid(), rule_id))
+        db().execute('DELETE FROM alert_rules WHERE uid=? AND id=? AND source=?', (uid(), rule_id, scope()))
         db().commit()
         return jsonify(status='Rule removed.')
 
