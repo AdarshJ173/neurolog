@@ -3,15 +3,15 @@ import re
 from collections import Counter
 
 RULES = [
-    ('database', ('database', 'sqlite', 'mongo', 'sql'), 'Database connectivity',
+    ('database', ('database', 'sqlite', 'mongo', 'sql', 'deadlock', 'connection pool', 'query execution'), 'Database connectivity',
      'Check database availability, connection limits, and query latency. Verify the timeout before changing it.'),
     ('memory', ('memory', 'oom', 'allocation'), 'Memory pressure',
      'Inspect process memory and container limits. Check recent growth and large allocations before restarting.'),
-    ('upstream', ('upstream', 'connection refused', '502', '503'), 'Upstream availability',
+    ('upstream', ('upstream', 'connection refused', '502', '503', 'gateway timeout', 'socket', 'connection reset'), 'Upstream availability',
      'Check the upstream health endpoint, address, port, and recent deployments. Review retry behavior.'),
     ('rate', ('rate limit', '429'), 'Request throttling',
      'Inspect request volume and retry-after values. Add bounded backoff and confirm the configured limit.'),
-    ('auth', ('unauthorized', 'forbidden', '401', '403'), 'Access rejection',
+    ('auth', ('unauthorized', 'forbidden', '401', '403', 'authentication failed', 'login attempt rejected', 'token refresh failed'), 'Access rejection',
      'Verify token expiry and required permissions without printing credentials.'),
 ]
 

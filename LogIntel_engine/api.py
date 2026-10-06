@@ -14,8 +14,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import DBSCAN
 try:
     from LogIntel_engine.analysis import analyze, detect_patterns, normalize_message
+    from LogIntel_engine.intelligence import investigate, vector_space
 except ImportError:
     from analysis import analyze, detect_patterns, normalize_message
+    from intelligence import investigate, vector_space
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / '.env')
@@ -54,7 +56,13 @@ def create_app(config=None):
                 id INTEGER PRIMARY KEY, uid TEXT NOT NULL, name TEXT NOT NULL,
                 digest TEXT UNIQUE NOT NULL, created_at TEXT NOT NULL, suffix TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS settings (uid TEXT PRIMARY KEY, retention INTEGER DEFAULT 14);
+            CREATE TABLE IF NOT EXISTS alert_rules (id INTEGER PRIMARY KEY, uid TEXT NOT NULL, condition TEXT NOT NULL, action TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS suppressions (uid TEXT NOT NULL, signature TEXT NOT NULL, PRIMARY KEY(uid, signature));
         ''')
+        columns = {r['name'] for r in db().execute('PRAGMA table_info(logs)')}
+        for column in ('entity_id', 'trace_id'):
+            if column not in columns:
+                db().execute(f'ALTER TABLE logs ADD COLUMN {column} TEXT')
         db().commit()
 
     def now():
@@ -104,8 +112,14 @@ def create_app(config=None):
         if type(level) is not int or not 0 <= level <= 7:
             raise ValueError('severity_level must be an integer from 0 to 7 (syslog).')
         labels = ['EMERGENCY', 'ALERT', 'CRITICAL', 'ERROR', 'WARNING', 'NOTICE', 'INFO', 'DEBUG']
-        db().execute('INSERT INTO logs(uid,timestamp,source,severity_level,severity_label,message) VALUES(?,?,?,?,?,?)',
-                     (owner, now(), source, level, labels[level], message))
+        metadata = []
+        for field in ('entity_id', 'trace_id'):
+            value = data.get(field)
+            if value is not None and (not isinstance(value, str) or len(value) > 120):
+                raise ValueError(f'{field} must be text, at most 120 characters.')
+            metadata.append(value)
+        db().execute('INSERT INTO logs(uid,timestamp,source,severity_level,severity_label,message,entity_id,trace_id) VALUES(?,?,?,?,?,?,?,?)',
+                     (owner, now(), source, level, labels[level], message, *metadata))
         db().commit()
 
     @app.errorhandler(ValueError)
@@ -165,6 +179,60 @@ def create_app(config=None):
     @app.get('/api/patterns')
     def patterns():
         return jsonify(detect_patterns(recent(uid(), 300)))
+
+    @app.get('/api/intelligence')
+    def intelligence():
+        owner = uid()
+        return jsonify(investigate(recent(owner, 300),
+            [r['signature'] for r in db().execute('SELECT signature FROM suppressions WHERE uid=?', (owner,))],
+            [dict(r) for r in db().execute('SELECT id,condition,action FROM alert_rules WHERE uid=?', (owner,))]))
+
+    @app.get('/api/vector-space')
+    def vectors():
+        selected = request.args.get('record_id')
+        if selected is not None:
+            try:
+                selected = int(selected)
+            except ValueError:
+                raise ValueError('record_id must be an integer.')
+        return jsonify(vector_space(recent(uid(), 150), selected))
+
+    @app.route('/api/alert-rules', methods=['GET', 'POST'])
+    def alert_rules():
+        owner = uid()
+        if request.method == 'POST':
+            data = body()
+            if data.get('condition') not in ('risk_gt_80', 'database_error', 'auth_repeated'):
+                raise ValueError('Choose a supported alert condition.')
+            if data.get('action') not in ('in_app', 'pagerduty', 'slack', 'webhook'):
+                raise ValueError('Choose a supported alert action.')
+            if db().execute('SELECT COUNT(*) FROM alert_rules WHERE uid=?', (owner,)).fetchone()[0] >= 20:
+                raise ValueError('At most 20 alert rules per workspace.')
+            db().execute('INSERT INTO alert_rules(uid,condition,action) VALUES(?,?,?)', (owner, data['condition'], data['action']))
+            db().commit()
+        return jsonify([dict(r) for r in db().execute('SELECT id,condition,action FROM alert_rules WHERE uid=?', (owner,))])
+
+    @app.delete('/api/alert-rules/<int:rule_id>')
+    def remove_rule(rule_id):
+        db().execute('DELETE FROM alert_rules WHERE uid=? AND id=?', (uid(), rule_id))
+        db().commit()
+        return jsonify(status='Rule removed.')
+
+    @app.post('/api/suppressions')
+    def suppression():
+        owner = uid()
+        data = body()
+        sig = text_field(data, 'signature', maximum=24)
+        if len(sig) != 24 or any(c not in '0123456789abcdef' for c in sig):
+            raise ValueError('Invalid signature.')
+        if type(data.get('suppressed')) is not bool:
+            raise ValueError('suppressed must be a boolean.')
+        if data['suppressed']:
+            db().execute('INSERT OR IGNORE INTO suppressions(uid,signature) VALUES(?,?)', (owner, sig))
+        else:
+            db().execute('DELETE FROM suppressions WHERE uid=? AND signature=?', (owner, sig))
+        db().commit()
+        return jsonify(status='Analyst preference saved; no model retraining performed.')
 
     @app.post('/api/run-ml')
     def run_ml():

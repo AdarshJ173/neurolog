@@ -1,7 +1,7 @@
 import {createElement} from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, Layers3, Search, Bot, Settings, PanelLeftClose, PanelLeftOpen, AudioLines } from 'lucide-react';
-const items=[['/dashboard',Activity,'Overview'],['/explorer',Search,'Log workspace'],['/analysis',Layers3,'Anomaly analysis'],['/assistant',Bot,'AI investigation'],['/configuration',Settings,'Settings']];
+import { Activity, Layers3, Search, Bot, Settings, PanelLeftClose, PanelLeftOpen, AudioLines, Workflow, ShieldAlert } from 'lucide-react';
+const items=[['/dashboard',Activity,'Overview'],['/explorer',Search,'Log workspace'],['/incidents',ShieldAlert,'Incident workbench'],['/pipeline',Workflow,'Pipeline Lab'],['/analysis',Layers3,'Anomaly analysis'],['/assistant',Bot,'AI investigation'],['/configuration',Settings,'Settings']];
 export default function Sidebar({isCollapsed,toggleSidebar}) {
   return <aside className={`sidebar ${isCollapsed?'collapsed':''}`}>
     <a className="brand" href="/dashboard"><span className="brand-mark"><AudioLines size={24}/></span><span>NeuroLog<span className="brand-caption">OBSERVABILITY</span></span></a>

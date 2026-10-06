@@ -36,6 +36,7 @@ class LogGenerator:
             (logging.ERROR, 'Database connection timeout duration_ms=%d'),
             (logging.ERROR, 'Upstream connection refused status=502 duration_ms=%d'),
             (logging.CRITICAL, 'Memory allocation failed available_mb=%d'),
+            (logging.ERROR, 'Authentication failed invalid token attempt=%d'),
         ]
         while not self.stop_event.is_set():
             with self.lock:
@@ -43,9 +44,11 @@ class LogGenerator:
                     return
             # Recurring incident bursts make small runs useful for pattern analysis.
             # Every six-entry cycle includes routine activity, warnings and errors.
-            cycle = [0, 3, 3, 2, 4, 4, 1, 0, 5, 0]
+            cycle = [0, 3, 3, 2, 4, 4, 1, 0, 5, 0, 6, 6, 6]
             level, pattern = patterns[cycle[self.generated % len(cycle)]]
-            self.logger.log(level, '[GENERATED] ' + pattern, random.randint(1, 5000))
+            self.logger.log(level, '[GENERATED] ' + pattern, random.randint(1, 5000),
+                extra={'entity_id': 'scenario-user' if level == logging.ERROR and 'Authentication' in pattern else 'scenario-service',
+                       'trace_id': 'scenario-' + str(self.generated // len(cycle))})
             with self.lock:
                 self.generated += 1
             if self.stop_event.wait(self.interval):

@@ -28,3 +28,7 @@ Original project: https://github.com/Sai-Nitin123/Neurolog-AI. Original MIT lice
 ## Incident analysis
 
 The AI Assistant groups warnings/errors by category and source, cites record IDs, and proposes investigation steps. Enter `source:task-service` to narrow local analysis. The interface distinguishes local rule-based analysis from Groq language-model responses. Set GROQ_API_KEY in the backend environment for conversational analysis. Provider failure returns a labeled local fallback.
+
+## Investigation workbench and pipeline lab
+
+Open `/incidents` for windowed risk scoring, entity/trace history, real TF-IDF neighbors, alert rules, reversible suppression, and filtered CSV export. Open `/pipeline` for the isolated reference simulator. Read [the complete feature comparison and guide](docs/REFERENCE_FEATURE_COMPARISON.md) for all 37 additions and the distinction between live analysis and illustrative lab controls.

@@ -51,7 +51,8 @@ class NeuroLogHandler(logging.Handler):
             severity = 7
         try:
             message = self.format(record) or "<empty log message>"
-            payload = json.dumps({'source': self.source, 'severity_level': severity, 'message': message[:10000]})
+            payload = json.dumps({'source': self.source, 'severity_level': severity, 'message': message[:10000],
+                'entity_id': getattr(record, 'entity_id', None), 'trace_id': getattr(record, 'trace_id', None)})
             with self._db() as connection:
                 if connection.execute('SELECT COUNT(*) FROM outbox').fetchone()[0] >= 10000:
                     print('NeuroLog outbox full; latest event could not be queued.', file=sys.stderr)

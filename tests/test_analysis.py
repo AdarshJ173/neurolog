@@ -43,7 +43,7 @@ def test_small_generator_run_has_repeated_errors():
     import logging
     class Capture:
         def __init__(self): self.entries = []
-        def log(self, level, template, value): self.entries.append((level, template % value))
+        def log(self, level, template, value, **kwargs): self.entries.append((level, template % value))
     capture = Capture()
     generator = LogGenerator(capture)
     generator.start(0.001, 6)
