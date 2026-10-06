@@ -22,5 +22,12 @@ def test_hosted_routes_source_and_log_ingestion(tmp_path):
     logs = client.get('/api/recent-logs').json
     assert any('Task created' in row['message'] for row in logs)
     assert client.get('/source/generator').json['running'] is False
+    assert client.get('/api/scenario-generator').json['running'] is False
+    assert client.post('/api/scenario-generator', json={'interval': .2, 'limit': 13}).status_code == 200
+    source.extensions['generator'].thread.join(timeout=5)
+    while handler.deliver_one():
+        pass
+    assert any(r['severity_level'] <= 3 for r in client.get('/api/recent-logs').json)
+    assert client.delete('/api/scenario-generator').json['running'] is False
     source.extensions['generator'].stop()
     handler.close()

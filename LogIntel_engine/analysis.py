@@ -42,6 +42,10 @@ def detect_patterns(records):
                       key=lambda g: g['count'], reverse=True)
     for pattern in patterns:
         rule = next((r for r in RULES if any(t in pattern['template'].lower() for t in r[1])), None)
+        names = {'database': 'Database timeouts', 'memory': 'Memory pressure', 'upstream': 'Upstream failures', 'rate': 'Rate-limit bursts', 'auth': 'Authentication failures'}
+        text = pattern['template'].lower()
+        fallback = next((name for term, name in [('heartbeat', 'Service heartbeat'), ('request completed', 'Successful requests'), ('background job', 'Background jobs'), ('task created', 'Task creation'), ('task completed', 'Task completion'), ('http request', 'HTTP activity')] if term in text), pattern['template'].split('=')[0][:60].strip())
+        pattern['name'] = names[rule[0]] if rule else fallback
         pattern['next_step'] = rule[3] if rule else 'Compare this repeated event with request volume and recent changes.'
         pattern['share_percent'] = round(pattern['count'] / max(len(records), 1) * 100, 1)
     return dict(records=len(records), patterns=patterns,
@@ -86,6 +90,6 @@ def analyze(records, question):
         lines.append('ML outliers are results of the last clustering run. Run clustering to refresh them; an outlier is not proof of failure.')
     patterns = detect_patterns(focused)
     for pattern in patterns['patterns'][:5]:
-        lines.append(f"Repeated pattern: **{pattern['count']} occurrences** on {pattern['source']}: {pattern['template']} (evidence IDs {pattern['evidence']}).")
+        lines.append(f"Repeated pattern **{pattern['name']}**: **{pattern['count']} occurrences** on {pattern['source']}: {pattern['template']} (evidence IDs {pattern['evidence']}).")
     lines.append('\nNo remediation commands have been executed. Use source:name to narrow the investigation.')
     return dict(reply='\n\n'.join(lines), mode='local', summary=summary, findings=findings, patterns=patterns['patterns'])

@@ -52,3 +52,8 @@ def test_small_generator_run_has_repeated_errors():
     errors = [message for level, message in capture.entries if level >= logging.ERROR]
     assert len(errors) == 4
     assert all(message.startswith('[GENERATED]') for message in errors)
+
+
+def test_pattern_names_are_stable_across_changing_measurements():
+    records = [dict(_id=i, message=f'[GENERATED] Database connection timeout duration_ms={i*100}', source='db', severity_label='ERROR', severity_level=3, timestamp='2026-10-06T00:00:00Z') for i in (1, 2)]
+    assert detect_patterns(records)['patterns'][0]['name'] == 'Database timeouts'

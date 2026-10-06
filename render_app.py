@@ -6,7 +6,7 @@ import atexit
 import threading
 import time
 from pathlib import Path
-from flask import send_from_directory, abort
+from flask import send_from_directory, abort, request, jsonify
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from LogIntel_engine.api import create_app as create_api
 from live_app.app import create_app as create_source
@@ -47,6 +47,13 @@ def create_hosted_app(database=None, tasks_database=None, start_sender=True, fro
         source.extensions['generator'].stop()
         handler.close()
     atexit.register(shutdown)
+
+    @api.route('/api/scenario-generator', methods=['GET', 'POST', 'DELETE'])
+    def scenarios():
+        with source.test_client() as client:
+            response = client.open('/generator', method=request.method,
+                                   json=request.get_json(silent=True) if request.method == 'POST' else None)
+            return jsonify(response.json), response.status_code
 
     @api.get('/')
     @api.get('/<path:path>')

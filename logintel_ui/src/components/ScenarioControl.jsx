@@ -1,0 +1,9 @@
+import {useState,useEffect} from 'react';
+import axios from 'axios';
+const api=axios.create({baseURL:import.meta.env.VITE_API_URL||'/api',timeout:10000});
+export default function ScenarioControl(){
+ const [status,setStatus]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{let active=true;async function refresh(){try{const r=await api.get('/scenario-generator',{skipError:true});if(active)setStatus(r.data);}catch{/* source unavailable in standalone API */}}refresh();const timer=setInterval(refresh,3000);return()=>{active=false;clearInterval(timer);};},[]);
+ async function control(){setBusy(true);setError('');try{const r=status?.running?await api.delete('/scenario-generator'):await api.post('/scenario-generator',{interval:1,limit:1000});setStatus(r.data);}catch{setError('Could not reach the hosted generator. You can also start scenarios in the log source.');}finally{setBusy(false);}}
+ return <article className="panel settings-card" style={{marginBottom:24}}><div className="panel-heading" style={{padding:0,marginBottom:12}}><div><h2>Error scenarios</h2><p>Generate recurring failures through the real ingestion pipeline.</p></div><button className="primary" disabled={busy} onClick={control}>{busy?'Updating…':status?.running?'Stop scenarios':'Start error scenarios'}</button></div><p>Includes database timeouts, upstream failures, authentication failures, memory errors, and routine activity. All generated records are labeled. Runs for up to 1,000 entries; you can stop at any time.</p><p role="status">{status?.running?`Running · ${status.generated} / ${status.limit} entries sent`:status?.generated?`Finished / stopped · ${status.generated} entries sent`:'Stopped · zero errors means none were received in the latest 300 records. A Render restart resets hosted data and stops the generator.'}</p>{error&&<p role="alert">{error}</p>}</article>;
+}
