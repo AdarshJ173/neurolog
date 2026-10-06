@@ -121,3 +121,25 @@ def test_connection_discovery_and_key_revocation(app):
     assert len(client.get('/api/recent-logs').json) == 1
     assert client.get('/api/get-keys').json == []
     assert client.delete(f"/api/keys/{created['id']}").status_code == 404
+
+
+def test_application_scoping_happens_before_limit_and_analysis(app):
+    client = app.test_client()
+    key = client.post('/api/generate-key', json={}).json['key']
+    headers = {'x-api-key': key}
+    for i in range(6):
+        client.post('/api/ingest', headers=headers, json={'source': 'guest-connect', 'message': 'Database timeout', 'severity_level': 3})
+    for i in range(8):
+        client.post('/api/ingest', headers=headers, json={'source': 'task-service', 'message': 'Routine task completed'})
+    logs = client.get('/api/recent-logs?source=guest-connect&limit=3').json
+    assert len(logs) == 3 and all(r['source'] == 'guest-connect' for r in logs)
+    patterns = client.get('/api/patterns?source=guest-connect').json
+    assert patterns['records'] == 6 and patterns['patterns'][0]['name'] == 'Database timeouts'
+    assert all(r['source'] == 'guest-connect' for r in client.get('/api/intelligence?source=guest-connect').json['records'])
+    reply = client.post('/api/chat?source=guest-connect', json={'message': 'Summarize errors'}).json
+    assert reply['summary']['records'] == 6 and reply['summary']['sources'] == 1
+    client.post('/api/run-ml?source=guest-connect')
+    assert all(r['cluster_id'] is None for r in client.get('/api/recent-logs?source=task-service').json)
+    client.post('/api/alert-rules?source=guest-connect', json={'condition': 'database_error', 'action': 'in_app'})
+    assert len(client.get('/api/alert-rules?source=guest-connect').json) == 1
+    assert client.get('/api/alert-rules?source=task-service').json == []
