@@ -96,7 +96,9 @@ def test_production_auth_and_user_isolation(tmp_path):
     with patch.object(firebase_admin, 'get_app'), patch.object(auth, 'verify_id_token', side_effect=lambda token, **kw: {'uid': token}):
         user_a = {'Authorization': 'Bearer user-a'}
         user_b = {'Authorization': 'Bearer user-b'}
-        key = client.post('/api/generate-key', json={'uid': 'user-b'}, headers=user_a).json['key']
+        created = client.post('/api/generate-key', json={'uid': 'user-b'}, headers=user_a).json
+        key = created['key']
+        assert client.delete(f"/api/keys/{created['id']}", headers=user_b).status_code == 404
         client.post('/api/ingest', json={'message': 'Private log'}, headers={'x-api-key': key})
         assert len(client.get('/api/recent-logs?uid=user-b', headers=user_a).json) == 1
         assert client.get('/api/recent-logs', headers=user_b).json == []
@@ -104,3 +106,18 @@ def test_production_auth_and_user_isolation(tmp_path):
         assert len(client.get('/api/recent-logs', headers=user_a).json) == 1
     with patch.object(firebase_admin, 'get_app'), patch.object(auth, 'verify_id_token', side_effect=ValueError('bad token')):
         assert client.get('/api/recent-logs', headers={'Authorization': 'Bearer bad'}).status_code == 401
+
+
+def test_connection_discovery_and_key_revocation(app):
+    client = app.test_client()
+    created = client.post('/api/generate-key', json={'app_name': 'inventory'}).json
+    headers = {'x-api-key': created['key']}
+    assert client.post('/api/ingest', headers=headers, json={'source': 'inventory', 'message': 'Connected', 'severity_level': 6}).status_code == 201
+    connection = client.get('/api/connections').json[0]
+    assert connection['source'] == 'inventory' and connection['records'] == 1
+    assert connection['last_seen']
+    assert client.delete(f"/api/keys/{created['id']}").status_code == 200
+    assert client.post('/api/ingest', headers=headers, json={'message': 'Blocked'}).status_code == 401
+    assert len(client.get('/api/recent-logs').json) == 1
+    assert client.get('/api/get-keys').json == []
+    assert client.delete(f"/api/keys/{created['id']}").status_code == 404

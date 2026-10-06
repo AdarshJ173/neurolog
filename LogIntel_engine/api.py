@@ -156,6 +156,19 @@ def create_app(config=None):
         db().commit()
         return jsonify(id=row.lastrowid, name=name, key=key, suffix=key[-6:], created_at=created), 201
 
+    @app.delete('/api/keys/<int:key_id>')
+    def revoke_key(key_id):
+        result = db().execute('DELETE FROM keys WHERE id=? AND uid=?', (key_id, uid()))
+        db().commit()
+        if not result.rowcount:
+            return jsonify(error='Key not found.'), 404
+        return jsonify(status='Key revoked. Previously received logs are preserved.')
+
+    @app.get('/api/connections')
+    def connections():
+        return jsonify([dict(row) for row in db().execute(
+            'SELECT source, COUNT(*) AS records, MAX(timestamp) AS last_seen FROM logs WHERE uid=? GROUP BY source ORDER BY last_seen DESC', (uid(),))])
+
     @app.post('/api/ingest')
     def ingest():
         key = request.headers.get('x-api-key', '')
