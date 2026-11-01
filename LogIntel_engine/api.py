@@ -15,9 +15,11 @@ from sklearn.cluster import DBSCAN
 try:
     from LogIntel_engine.analysis import analyze, detect_patterns, normalize_message
     from LogIntel_engine.intelligence import investigate, vector_space
+    from LogIntel_engine.github_integration import register_github
 except ImportError:
     from analysis import analyze, detect_patterns, normalize_message
     from intelligence import investigate, vector_space
+    from github_integration import register_github
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / '.env')
@@ -287,7 +289,10 @@ def create_app(config=None):
 
     @app.delete('/api/logs')
     def purge():
-        db().execute('DELETE FROM logs WHERE uid=?', (uid(),))
+        owner = uid()
+        db().execute('DELETE FROM logs WHERE uid=?', (owner,))
+        db().execute('DELETE FROM github_imports WHERE uid=?', (owner,))
+        db().execute('DELETE FROM github_resolutions WHERE uid=?', (owner,))
         db().commit()
         return jsonify(status='Workspace logs deleted.')
 
@@ -313,6 +318,7 @@ def create_app(config=None):
             result['provider_warning'] = 'Language model unavailable; showing local analysis.'
             return jsonify(result)
 
+    register_github(app, db, uid, body, now)
     return app
 
 

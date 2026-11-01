@@ -1,7 +1,8 @@
 import axios from 'axios';
 const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/api', timeout: 35000 });
 let applicationSource='';
-export function selectApplication(source){applicationSource=source;}
+try{applicationSource=sessionStorage.getItem('neurolog-application')||'';}catch{/* storage unavailable */}
+export function selectApplication(source){applicationSource=source;try{sessionStorage.setItem('neurolog-application',source);}catch{/* storage unavailable */}}
 export function selectedApplication(){return applicationSource;}
 const scopedPaths=['/recent-logs','/patterns','/intelligence','/vector-space','/run-ml','/chat','/alert-rules'];
 api.interceptors.request.use(config=>{if(applicationSource&&scopedPaths.some(p=>config.url.split('?')[0]===p||config.url.startsWith(p+'/'))){config.params={...config.params,source:applicationSource};}return config;});
