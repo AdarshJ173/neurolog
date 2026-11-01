@@ -1,6 +1,6 @@
 import {useState,useEffect,useRef,lazy,Suspense} from 'react';
 import {Link,BrowserRouter,Routes,Route,Navigate,useLocation,useNavigate} from 'react-router-dom';
-import {Search,Menu,Sun,Moon,ChevronRight,AlertCircle,X} from 'lucide-react';
+import {Search,Menu,Sun,Moon,ChevronRight,AlertCircle,X,ArrowUpRight} from 'lucide-react';
 import {selectApplication,selectedApplication} from './api';
 import Applications from './pages/Applications';
 import Sidebar from './components/Sidebar';
@@ -35,7 +35,7 @@ function Layout(){
    <header className="topbar">
     <div className="topbar-location"><button className="icon-button mobile-menu-button" aria-label="Open navigation" onClick={()=>menuRef.current?.showModal()}><Menu size={19}/></button><Link to="/applications" className="workspace-top-label">Workspace</Link><ChevronRight size={13} aria-hidden="true"/><strong>{names[location.pathname]||'Overview'}</strong></div>
     {application&&<form className="global-search" onSubmit={submitSearch}><Search size={15} aria-hidden="true"/><input ref={searchRef} aria-label="Search all logs" placeholder="Search logs…" value={search} onChange={e=>setSearch(e.target.value)}/><kbd>Ctrl K</kbd></form>}
-    <div className="topbar-actions"><button className="icon-button theme-toggle" aria-label={isDark?'Switch to light theme':'Switch to dark theme'} onClick={()=>setThemeMode(isDark?'light':'dark')}>{isDark?<Sun size={17}/>:<Moon size={17}/>}</button></div>
+    <div className="topbar-actions"><a className="button secondary source-shortcut" href="/source/" target="_blank" rel="noopener noreferrer">Go to source<ArrowUpRight size={14}/></a><button className="icon-button theme-toggle" aria-label={isDark?'Switch to light theme':'Switch to dark theme'} onClick={()=>setThemeMode(isDark?'light':'dark')}>{isDark?<Sun size={17}/>:<Moon size={17}/>}</button></div>
    </header>
    <main id="main" className="page-content">
     {error&&<div role="alert" className="notice error"><AlertCircle size={17}/><span>{error}</span><button className="icon-button" aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}

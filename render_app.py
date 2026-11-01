@@ -3,8 +3,6 @@
 Only fresh hosted data is used. One Gunicorn worker owns the sender/generator.
 """
 import atexit
-import threading
-import time
 from pathlib import Path
 from flask import send_from_directory, abort, request, jsonify
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
@@ -32,18 +30,7 @@ def create_hosted_app(database=None, tasks_database=None, start_sender=True, fro
                              data_dir / 'hosted-outbox.db', data_dir / 'unused.key', transport=deliver)
     source = create_source({'DATABASE': str(tasks_database or data_dir / 'tasks.db')}, handler)
     source.config['DASHBOARD_URL'] = '/dashboard'
-    stopped = threading.Event()
-
-    def heartbeat():
-        while not stopped.wait(5):
-            with source.extensions['counter_lock']:
-                count = source.extensions['request_count']
-            source.extensions['event_logger'].info(
-                'Service heartbeat uptime_seconds=%.1f requests=%d queued_logs=%d',
-                time.monotonic() - source.extensions['started'], count, handler.pending())
-
     def shutdown():
-        stopped.set()
         source.extensions['generator'].stop()
         handler.close()
     atexit.register(shutdown)
@@ -72,7 +59,6 @@ def create_hosted_app(database=None, tasks_database=None, start_sender=True, fro
         key = client.post('/api/generate-key', json={'app_name': 'hosted-python-source'}).json['key']
     if start_sender:
         handler.start()
-        threading.Thread(target=heartbeat, daemon=True, name='hosted-heartbeat').start()
     application = DispatcherMiddleware(api, {'/source': source})
     return application, api, source, handler
 

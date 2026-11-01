@@ -54,7 +54,7 @@ def create_app(config=None, log_handler=None):
             app.extensions['request_count'] += 1
         level = logging.ERROR if response.status_code >= 500 else logging.WARNING if response.status_code >= 400 else logging.INFO
         # Log path and status, never request headers, credentials, or request bodies.
-        if request.method != 'GET' or request.path != '/generator':
+        if request.method not in ('GET', 'HEAD', 'OPTIONS') or response.status_code >= 400:
             logger.log(level, 'HTTP %s %s status=%d duration_ms=%.2f', request.method, request.path, response.status_code, duration)
         return response
 
@@ -135,27 +135,10 @@ def main():
         api_key=os.getenv('NEUROLOG_INGEST_KEY'))
     app = create_app(log_handler=handler)
     handler.start()
-    stopped = threading.Event()
-    logger = app.extensions['event_logger']
-
-    def heartbeat():
-        while not stopped.wait(5):
-            with app.app_context():
-                with sqlite3.connect(app.config['DATABASE']) as connection:
-                    total, done = connection.execute('SELECT COUNT(*),COALESCE(SUM(done),0) FROM tasks').fetchone()
-                with app.extensions['counter_lock']:
-                    requests = app.extensions['request_count']
-                logger.info('Service heartbeat uptime_seconds=%.1f requests=%d tasks=%d completed=%d queued_logs=%d',
-                            time.monotonic() - app.extensions['started'], requests, total, done, handler.pending())
-
-    threading.Thread(target=heartbeat, name='task-service-heartbeat', daemon=True).start()
-    logger.info('Task service starting on http://127.0.0.1:8000')
     try:
         app.run(host='127.0.0.1', port=8000, debug=False, threaded=True)
     finally:
-        stopped.set()
         app.extensions['generator'].stop()
-        logger.info('Task service stopping')
         handler.close()
 
 

@@ -31,3 +31,28 @@ def test_hosted_routes_source_and_log_ingestion(tmp_path):
     assert client.delete('/api/scenario-generator').json['running'] is False
     source.extensions['generator'].stop()
     handler.close()
+
+
+def test_hosted_source_stays_idle_until_explicit_start(tmp_path):
+    import time
+    application, api, source, handler = create_hosted_app(
+        tmp_path / 'logs.db', tmp_path / 'tasks.db', start_sender=True)
+    client = Client(application, Response)
+    try:
+        assert client.get('/source/').status_code == 200
+        assert client.get('/source/tasks').json == []
+        assert client.get('/source/health').status_code == 200
+        assert client.get('/api/scenario-generator').json['generated'] == 0
+        time.sleep(5.2)  # Past the former automatic heartbeat interval.
+        assert client.get('/api/recent-logs').json == []
+        assert handler.pending() == 0
+        assert not source.extensions['generator'].status()['running']
+        assert client.post('/source/generator', json={'interval': .2, 'limit': 1}).status_code == 200
+        source.extensions['generator'].thread.join(timeout=2)
+        deadline = time.monotonic() + 3
+        while not client.get('/api/recent-logs').json and time.monotonic() < deadline:
+            time.sleep(.05)
+        assert any(row['message'].startswith('[GENERATED]') for row in client.get('/api/recent-logs').json)
+    finally:
+        source.extensions['generator'].stop()
+        handler.close()
