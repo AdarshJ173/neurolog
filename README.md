@@ -1,5 +1,7 @@
 # NeuroLog AI
 
+Project repository: [shahrukh-210906/neurolog](https://github.com/shahrukh-210906/neurolog).
+
 Live application logging with a React dashboard, Flask ingestion API, SQLite storage, and TF-IDF/DBSCAN analysis. Opens directly without login on the local machine.
 
 ## Start
@@ -31,7 +33,7 @@ The backend uses GitHub's [workflow runs API](https://docs.github.com/en/rest/ac
 
 Every failed run and saved finding includes a later-commit tag. **Likely resolved** means the latest comparable workflow passed on a verified descendant commit. **Workflow still failing** means that later workflow failed; it may have different errors. **Not verified** covers missing evidence, no comparable later commit, unfinished runs, or unavailable access. These are workflow-level signals, not proof that an individual error was fixed.
 
-Checks inspect the latest 100 repository runs, matching workflow, branch, event, source repository, and pull-request numbers. Same-commit reruns do not count as later commits. Expand a tag for the reason, check time, and later run/commit links. Use **Check later commits** on a saved summary to refresh its evidence. Checks run on request; cached tags do not update continuously.
+Checks inspect the latest 100 repository runs, matching workflow, branch, event, source repository, and pull-request numbers. Same-commit reruns do not count as later commits. Select a run’s outcome for the reason, check time, and later run/commit links. Saved findings keep expandable tags alongside their evidence. Use **Check later commits** on a saved summary to refresh its evidence. Checks run on request; cached tags do not update continuously.
 
 ## Interface
 

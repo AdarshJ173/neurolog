@@ -3,7 +3,7 @@ services:
     name: neurolog-ai
     runtime: docker
     plan: free
-    branch: codex/neurolog-fixes
+    branch: main
     healthCheckPath: /api/health
     envVars:
       - key: NEUROLOG_LOCAL_MODE
