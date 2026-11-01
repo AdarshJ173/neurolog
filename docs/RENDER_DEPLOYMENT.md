@@ -1,6 +1,6 @@
 # Deploy NeuroLog on Render
 
-Deploy this repository's `codex/neurolog-fixes` branch as a Docker web service, using the root Dockerfile and the Free instance type. Leave Root Directory empty. Set health check path to `/api/health`. The container binds to Render's PORT and runs one Gunicorn worker with four threads.
+Deploy [shahrukh-210906/neurolog](https://github.com/shahrukh-210906/neurolog), branch `main`, as a Docker web service, using the root Dockerfile and the Free instance type. Leave Root Directory empty. Set health check path to `/api/health`. The container binds to Render's PORT and runs one Gunicorn worker with four threads.
 
 The frontend is compiled during the Docker build. The dashboard and API share one origin; the Python application is mounted at `/source/`. Runtime messages are delivered internally to the API using the same ingestion validation as local operation.
 
@@ -10,6 +10,8 @@ This is the intentionally login-free presentation workspace. Anyone with the pub
 
 Free Render service storage is ephemeral: tasks, received logs and queue data reset on restart, redeploy or idle shutdown. A paid persistent disk or a database migration is required for durable hosted storage. The blueprint does not provision paid resources.
 
-After deployment verify `/api/health`, `/dashboard`, `/source/`, task creation, scenario generation, received logs and AI investigation. A cold free service can take about a minute to wake up. The Render plugin must be connected to create and verify the service through this chat.
+The existing service is `neurolog-ai` at https://neurolog-ai.onrender.com. Its source is the standalone public Git repository. For a public Git source without a Blueprint, deploy future changes using **Manual Deploy → Deploy latest commit** in Render.
+
+After deployment verify `/api/health`, `/dashboard`, `/source/`, task creation, scenario generation, received logs and AI investigation. A cold free service can take about a minute to wake up.
 
 Reference: https://render.com/docs/deploy-flask and https://render.com/docs/free
