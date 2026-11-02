@@ -54,6 +54,7 @@ def create_app(config=None):
                 severity_label TEXT NOT NULL, message TEXT NOT NULL,
                 ml_anomaly INTEGER DEFAULT 0, cluster_id INTEGER DEFAULT NULL);
             CREATE INDEX IF NOT EXISTS logs_owner_time ON logs(uid, timestamp);
+            CREATE INDEX IF NOT EXISTS logs_owner_source ON logs(uid, source);
             CREATE TABLE IF NOT EXISTS keys (
                 id INTEGER PRIMARY KEY, uid TEXT NOT NULL, name TEXT NOT NULL,
                 digest TEXT UNIQUE NOT NULL, created_at TEXT NOT NULL, suffix TEXT NOT NULL);
@@ -68,8 +69,10 @@ def create_app(config=None):
         rule_columns = {r['name'] for r in db().execute('PRAGMA table_info(alert_rules)')}
         if 'source' not in rule_columns:
             db().execute("ALTER TABLE alert_rules ADD COLUMN source TEXT NOT NULL DEFAULT ''")
+        key_columns = {r['name'] for r in db().execute('PRAGMA table_info(keys)')}
+        if 'source' not in key_columns:
+            db().execute("ALTER TABLE keys ADD COLUMN source TEXT NOT NULL DEFAULT ''")
         db().commit()
-
     def scope():
         return request.args.get('source', '').strip()
 
@@ -179,6 +182,59 @@ def create_app(config=None):
         return jsonify([dict(row) for row in db().execute(
             'SELECT source, COUNT(*) AS records, MAX(timestamp) AS last_seen FROM logs WHERE uid=? GROUP BY source ORDER BY last_seen DESC', (uid(),))])
 
+    @app.get('/api/applications')
+    def get_applications():
+        owner = uid()
+        rows = db().execute(
+            'SELECT source, COUNT(*) AS records, MAX(timestamp) AS last_seen FROM logs WHERE uid=? GROUP BY source ORDER BY last_seen DESC', (owner,)
+        ).fetchall()
+        return jsonify([dict(r) for r in rows])
+
+    @app.get('/api/applications/<path:app_source>')
+    def get_single_application(app_source):
+        owner = uid()
+        app_source = app_source.strip()
+        row = db().execute(
+            'SELECT source, COUNT(*) AS records, MAX(timestamp) AS last_seen, MIN(timestamp) AS first_seen FROM logs WHERE uid=? AND source=? GROUP BY source',
+            (owner, app_source)
+        ).fetchone()
+        if not row:
+            return jsonify(error='Application not found.'), 404
+        return jsonify(dict(row))
+
+    @app.delete('/api/applications/<path:app_source>')
+    def delete_application(app_source):
+        owner = uid()
+        app_source = app_source.strip()
+        if not app_source:
+            raise ValueError('Specify an application source to delete.')
+        log_count = db().execute('SELECT COUNT(*) FROM logs WHERE uid=? AND source=?', (owner, app_source)).fetchone()[0]
+        if log_count == 0:
+            return jsonify(error='Application not found or has no records.'), 404
+        db().execute('DELETE FROM logs WHERE uid=? AND source=?', (owner, app_source))
+        db().execute('DELETE FROM alert_rules WHERE uid=? AND source=?', (owner, app_source))
+        if app_source.startswith('github:'):
+            gh_repo = app_source.removeprefix('github:')
+            db().execute('DELETE FROM github_imports WHERE uid=? AND repo=?', (owner, gh_repo))
+            db().execute('DELETE FROM github_resolutions WHERE uid=? AND repo=?', (owner, gh_repo))
+        db().commit()
+        return jsonify(status=f'Application "{app_source}" and its {log_count} records were deleted.', deleted_records=log_count)
+
+    @app.put('/api/applications/<path:app_source>')
+    def rename_application(app_source):
+        owner = uid()
+        app_source = app_source.strip()
+        data = body()
+        new_source = text_field(data, 'new_source', maximum=120)
+        if app_source == new_source:
+            return jsonify(status='No change in source name.', renamed_records=0)
+        count = db().execute('SELECT COUNT(*) FROM logs WHERE uid=? AND source=?', (owner, app_source)).fetchone()[0]
+        if count == 0:
+            return jsonify(error='Application not found.'), 404
+        db().execute('UPDATE logs SET source=? WHERE uid=? AND source=?', (new_source, owner, app_source))
+        db().execute('UPDATE alert_rules SET source=? WHERE uid=? AND source=?', (new_source, owner, app_source))
+        db().commit()
+        return jsonify(status=f'Renamed application "{app_source}" to "{new_source}".', renamed_records=count, new_source=new_source)
     @app.post('/api/ingest')
     def ingest():
         key = request.headers.get('x-api-key', '')
@@ -199,6 +255,61 @@ def create_app(config=None):
             raise ValueError('limit must be an integer from 1 to 1000.')
         return jsonify(recent(owner, limit))
 
+    @app.get('/api/logs/<int:log_id>')
+    def get_single_log(log_id):
+        row = db().execute('SELECT * FROM logs WHERE _id=? AND uid=?', (log_id, uid())).fetchone()
+        if not row:
+            return jsonify(error='Log record not found.'), 404
+        return jsonify(dict(row))
+
+    @app.delete('/api/logs/<int:log_id>')
+    def delete_single_log(log_id):
+        result = db().execute('DELETE FROM logs WHERE _id=? AND uid=?', (log_id, uid()))
+        db().commit()
+        if not result.rowcount:
+            return jsonify(error='Log record not found.'), 404
+        return jsonify(status='Log record deleted.', id=log_id)
+
+    @app.put('/api/logs/<int:log_id>')
+    def update_single_log(log_id):
+        owner = uid()
+        row = db().execute('SELECT * FROM logs WHERE _id=? AND uid=?', (log_id, owner)).fetchone()
+        if not row:
+            return jsonify(error='Log record not found.'), 404
+        data = body()
+        fields = []
+        values = []
+        if 'message' in data:
+            fields.append('message=?')
+            values.append(text_field(data, 'message'))
+        if 'severity_level' in data:
+            level = data['severity_level']
+            if type(level) is not int or not 0 <= level <= 7:
+                raise ValueError('severity_level must be an integer from 0 to 7 (syslog).')
+            labels = ['EMERGENCY', 'ALERT', 'CRITICAL', 'ERROR', 'WARNING', 'NOTICE', 'INFO', 'DEBUG']
+            fields.append('severity_level=?')
+            values.append(level)
+            fields.append('severity_label=?')
+            values.append(labels[level])
+        if 'entity_id' in data:
+            entity = data['entity_id']
+            if entity is not None and (not isinstance(entity, str) or len(entity) > 120):
+                raise ValueError('entity_id must be text, at most 120 characters.')
+            fields.append('entity_id=?')
+            values.append(entity)
+        if 'trace_id' in data:
+            trace = data['trace_id']
+            if trace is not None and (not isinstance(trace, str) or len(trace) > 120):
+                raise ValueError('trace_id must be text, at most 120 characters.')
+            fields.append('trace_id=?')
+            values.append(trace)
+        if not fields:
+            return jsonify(dict(row))
+        values.extend([log_id, owner])
+        db().execute(f'UPDATE logs SET {", ".join(fields)} WHERE _id=? AND uid=?', values)
+        db().commit()
+        updated = db().execute('SELECT * FROM logs WHERE _id=? AND uid=?', (log_id, owner)).fetchone()
+        return jsonify(dict(updated))
     @app.get('/api/patterns')
     def patterns():
         return jsonify(detect_patterns(recent(uid(), 300)))
@@ -290,11 +401,45 @@ def create_app(config=None):
     @app.delete('/api/logs')
     def purge():
         owner = uid()
+        target_source = scope()
+        if target_source:
+            count = db().execute('SELECT COUNT(*) FROM logs WHERE uid=? AND source=?', (owner, target_source)).fetchone()[0]
+            db().execute('DELETE FROM logs WHERE uid=? AND source=?', (owner, target_source))
+            if target_source.startswith('github:'):
+                gh_repo = target_source.removeprefix('github:')
+                db().execute('DELETE FROM github_imports WHERE uid=? AND repo=?', (owner, gh_repo))
+                db().execute('DELETE FROM github_resolutions WHERE uid=? AND repo=?', (owner, gh_repo))
+            db().commit()
+            return jsonify(status=f'Logs deleted for source {target_source}.', deleted_count=count)
         db().execute('DELETE FROM logs WHERE uid=?', (owner,))
         db().execute('DELETE FROM github_imports WHERE uid=?', (owner,))
         db().execute('DELETE FROM github_resolutions WHERE uid=?', (owner,))
         db().commit()
         return jsonify(status='Workspace logs deleted.')
+
+    @app.get('/api/stats')
+    def stats():
+        owner = uid()
+        target_source = scope()
+        where = 'WHERE uid=?' + (' AND source=?' if target_source else '')
+        params = (owner, target_source) if target_source else (owner,)
+        total = db().execute(f'SELECT COUNT(*) FROM logs {where}', params).fetchone()[0]
+        errors = db().execute(f'SELECT COUNT(*) FROM logs {where} AND severity_level<=3', params).fetchone()[0]
+        warnings = db().execute(f'SELECT COUNT(*) FROM logs {where} AND severity_level=4', params).fetchone()[0]
+        anomalies = db().execute(f'SELECT COUNT(*) FROM logs {where} AND ml_anomaly=1', params).fetchone()[0]
+        first_seen = db().execute(f'SELECT MIN(timestamp) FROM logs {where}', params).fetchone()[0]
+        last_seen = db().execute(f'SELECT MAX(timestamp) FROM logs {where}', params).fetchone()[0]
+        sources_count = db().execute(f'SELECT COUNT(DISTINCT source) FROM logs WHERE uid=?', (owner,)).fetchone()[0]
+        return jsonify(
+            total_logs=total,
+            errors=errors,
+            warnings=warnings,
+            anomalies=anomalies,
+            first_seen=first_seen,
+            last_seen=last_seen,
+            active_sources=sources_count,
+            scoped_source=target_source or None
+        )
 
     @app.post('/api/chat')
     def chat():
