@@ -27,16 +27,28 @@ def received_minute(record):
     return datetime.fromisoformat(record['timestamp'].replace('Z', '+00:00')).replace(second=0, microsecond=0)
 
 
-def detect_spikes(records, window_minutes=5, baseline_minutes=30, minimum=5, min_baseline=5):
+def stored_minute_counts(rows):
+    """Turn (source, generated, 'YYYY-MM-DDTHH:MM', n) rows from SQLite into detect_spikes counts."""
+    counts = defaultdict(Counter)
+    for source, generated, minute, n in rows:
+        counts[(source, bool(generated))][datetime.fromisoformat(minute).replace(tzinfo=timezone.utc)] += n
+    return counts
+
+
+def detect_spikes(records, window_minutes=5, baseline_minutes=30, minimum=5, min_baseline=5,
+                  minute_counts=None, observed_since=None):
     """Flag a warning/error burst far above the same source's own per-minute baseline.
 
     The baseline counts quiet minutes as zero, so it only uses minutes after the oldest
     received record; with fewer than min_baseline observed minutes no spike is claimed.
+    minute_counts/observed_since come from storage so busy sources are not limited to the
+    records window. GitHub imports are excluded: their old CI lines share one import time.
     """
-    if not records:
+    oldest = observed_since or (min(r['timestamp'] for r in records) if records else None)
+    if not oldest:
         return []
     window_start = datetime.now(timezone.utc).replace(second=0, microsecond=0) - timedelta(minutes=window_minutes - 1)
-    observed = max(min(received_minute(r) for r in records) + timedelta(minutes=1),
+    observed = max(received_minute(dict(timestamp=oldest)) + timedelta(minutes=1),
                    window_start - timedelta(minutes=baseline_minutes))
     span = int((window_start - observed).total_seconds() // 60)
     if span < min_baseline:
@@ -49,6 +61,10 @@ def detect_spikes(records, window_minutes=5, baseline_minutes=30, minimum=5, min
             key = (r['source'], r['message'].startswith('[GENERATED]'))
             counts[key][at] += 1
             members[key, at].append(r['_id'])
+    if minute_counts is not None:
+        counts = {key: Counter({m: n for m, n in per_minute.items() if m >= observed})
+                  for key, per_minute in minute_counts.items()}
+    counts = {key: per_minute for key, per_minute in counts.items() if not key[0].startswith('github:')}
     spikes = []
     for (source, generated), per_minute in counts.items():
         baseline = [per_minute[m] for m in baseline_span]
@@ -60,14 +76,14 @@ def detect_spikes(records, window_minutes=5, baseline_minutes=30, minimum=5, min
         if peak >= threshold:
             spikes.append(dict(source=source, generated=generated, minute=peak_at.isoformat(), count=peak,
                                baseline_median=median, threshold=round(threshold, 1), baseline_minutes=span,
-                               records=members[(source, generated), peak_at]))
+                               records=members.get(((source, generated), peak_at), [])))
     return sorted(spikes, key=lambda s: s['count'], reverse=True)
 
 
-def investigate(records, suppressed=(), rules=(), window_minutes=5):
+def investigate(records, suppressed=(), rules=(), window_minutes=5, minute_counts=None, observed_since=None):
     started = time.perf_counter()
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
-    spikes = detect_spikes(records, window_minutes)
+    spikes = detect_spikes(records, window_minutes, minute_counts=minute_counts, observed_since=observed_since)
     spiking = {i: s for s in spikes for i in s['records']}
     counts = Counter()
     for r in records:
