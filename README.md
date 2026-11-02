@@ -1,58 +1,245 @@
+<div align="center">
+
 # NeuroLog AI
 
-Project repository: [shahrukh-210906/neurolog](https://github.com/shahrukh-210906/neurolog).
+**Application log intelligence: ingest, cluster, investigate, and triage, with every claim traceable to a real record.**
 
-Live application logging with a React dashboard, Flask ingestion API, SQLite storage, and TF-IDF/DBSCAN analysis. Opens directly without login on the local machine.
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/API-Flask-000000?logo=flask)
+![React](https://img.shields.io/badge/UI-React-61DAFB?logo=react&logoColor=black)
+![SQLite](https://img.shields.io/badge/Storage-SQLite%20WAL-003B57?logo=sqlite&logoColor=white)
+![ML](https://img.shields.io/badge/ML-TF--IDF%20%2B%20DBSCAN-F7931E?logo=scikitlearn&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## Start
+[Quick start](#quick-start) | [Architecture](#architecture) | [Intelligence](#how-the-intelligence-works) | [API](#api-reference) | [GitHub Actions](#github-actions-analysis) | [Docs](#documentation)
 
-Run `powershell -ExecutionPolicy Bypass -File .\start-preview.ps1` from this folder. Python 3.12 and Node.js are required. The launcher installs missing dependencies and starts three background services.
+![NeuroLog preview](docs/preview.png)
 
-- Python task application: http://127.0.0.1:8000
-- NeuroLog dashboard: http://127.0.0.1:5173/dashboard
+</div>
 
-Create a task and complete it. The application sends actual task events, request durations/status codes, and measured service heartbeats to NeuroLog. Open Log Explorer to see the `task-service` stream. The dashboard polls every two seconds; Explorer every three seconds. Run clustering to refresh ML analysis.
+> Upstream repository: [shahrukh-210906/neurolog](https://github.com/shahrukh-210906/neurolog). Original project: [Sai-Nitin123/Neurolog-AI](https://github.com/Sai-Nitin123/Neurolog-AI). Original MIT license and contributor attribution retained.
 
-The sender persists events in a SQLite outbox and retries failed delivery. Optional random generation is available in the Python app, with a rate, finite limit, and Stop control. Generated messages carry [GENERATED] and are treated separately by analysis. Current received logs use `data/neurolog-live.db`; previous records remain preserved in the older database.
+## Why NeuroLog
 
-## Documentation
+| Principle | What it means in practice |
+|---|---|
+| Evidence first | Findings cite record IDs. Log text is treated as evidence, never as instructions. |
+| Honest analysis | Local rule-based analysis is labelled as such. Outliers and spikes are signals, not proof of failure. |
+| Local by default | Login-free workspace on localhost, SQLite storage, no data leaves the machine unless Groq is configured. |
+| Synthetic data stays separate | Messages tagged `[GENERATED]` are analysed apart from real traffic. |
 
-Read `docs/USER_GUIDE.md` or `output/pdf/NeuroLog_User_Guide.pdf` for architecture, integration, settings, and troubleshooting.
+## Architecture
 
-## GitHub Actions
+```mermaid
+flowchart LR
+    A[Your application] -->|x-api-key + JSON| B[Flask API<br/>LogIntel_engine/api.py]
+    G[GitHub Actions runs] -->|import| B
+    B --> C[(SQLite<br/>WAL mode)]
+    C --> D[Pattern detection<br/>analysis.py]
+    C --> E[Risk scoring and spikes<br/>intelligence.py]
+    C --> F[TF-IDF + DBSCAN<br/>/api/run-ml]
+    D --> H[React dashboard]
+    E --> H
+    F --> H
+    B -.->|optional GROQ_API_KEY| L[Groq LLM]
+    L -.-> H
+```
 
-Open **GitHub Actions** in the sidebar (or `/github`). Connect `owner/repository`, choose **Find failed runs**, then **Import & analyze**. Imported logs appear as a `github:owner/repository` application with build, commit, and available pull-request links. Failure summaries use local rules, cite imported record IDs, and suggest investigation steps; they do not establish a root cause.
+### Request lifecycle
 
-Public repository browsing works without a token. Private repositories and restricted log downloads require a fine-grained GitHub token with **Actions: Read** on the selected repository (and repository metadata access). Add **Contents: Read** to verify later-commit ancestry in private repositories. Enter it in the password field; NeuroLog keeps it only in page memory and uses it for the current requests. It is not stored in the database, browser storage, or environment. Leaving/reloading the page clears it. Do not use private logs in a shared public demo.
+```mermaid
+sequenceDiagram
+    participant App as Your app
+    participant API as Flask API
+    participant DB as SQLite
+    participant UI as Dashboard
+    App->>API: POST /api/ingest (x-api-key)
+    API->>DB: Verify SHA-256 key digest
+    API->>DB: Insert log (UTC timestamp)
+    API-->>App: 201 success
+    UI->>API: GET /api/recent-logs
+    API->>DB: Apply retention, then query
+    API-->>UI: Logs with ML flags
+    UI->>API: POST /api/run-ml
+    API->>DB: Store anomaly and cluster ids
+```
 
-Imports are manual and deduplicated by repository, run ID, and attempt. The latest 20 failed runs are listed. Each archive is limited to 8 MB compressed, 12 MB expanded, 500 text files, and 100,000 scanned lines. Up to 1,500 nonempty lines are retained, prioritizing errors. Truncated imports are labeled. GitHub's combined job files are skipped when individual step files are present, avoiding duplicate evidence. Common token/credential patterns are redacted, but this is not a complete secret scanner.
+## How the intelligence works
 
-Logs follow the existing retention policy; saved summaries remain available until **Delete logs** is used, which also clears GitHub import history and permits reimporting. Repository connections remain saved. There is no automatic monitoring, repository modification, or issue creation in this first version.
+Each record gets a transparent, additive risk score: base severity points, plus recurrence, volume-spike and clustering-outlier bonuses, minus analyst suppression. The score is capped to 0-100. Base points per syslog severity, as implemented in `intelligence.py`:
 
-The backend uses GitHub's [workflow runs API](https://docs.github.com/en/rest/actions/workflow-runs) and downloads the selected attempt's archive. Expired logs, unavailable repositories, access errors, and rate limits produce actionable messages. Test coverage uses mocked GitHub responses and real ZIP archives, without requiring credentials.
+```mermaid
+xychart-beta
+    title "Base risk points by syslog severity"
+    x-axis ["0 EMERG", "1 ALERT", "2 CRIT", "3 ERR", "4 WARN", "5 NOTICE", "6 INFO", "7 DEBUG"]
+    y-axis "Points" 0 --> 100
+    bar [80, 75, 70, 50, 25, 10, 5, 0]
+```
 
-Every failed run and saved finding includes a later-commit tag. **Likely resolved** means the latest comparable workflow passed on a verified descendant commit. **Workflow still failing** means that later workflow failed; it may have different errors. **Not verified** covers missing evidence, no comparable later commit, unfinished runs, or unavailable access. These are workflow-level signals, not proof that an individual error was fixed.
+| Signal | Effect on score |
+|---|---|
+| Recurrence: 3 or more warnings/errors for the same category and entity within 5 minutes | +20 |
+| Volume spike against the source's own per-minute baseline | +15 |
+| Stored TF-IDF/DBSCAN outlier | +10 |
+| Analyst suppression | -45 |
 
-Checks inspect the latest 100 repository runs, matching workflow, branch, event, source repository, and pull-request numbers. Same-commit reruns do not count as later commits. Select a run’s outcome for the reason, check time, and later run/commit links. Saved findings keep expandable tags alongside their evidence. Use **Check later commits** on a saved summary to refresh its evidence. Checks run on request; cached tags do not update continuously.
+```mermaid
+flowchart TD
+    R[Raw message] --> N[Normalize<br/>numbers and UUIDs become placeholders]
+    N --> P[Group into repeated patterns]
+    N --> V[TF-IDF vectors]
+    V --> K[DBSCAN eps 0.5, min 2]
+    K --> O{Cluster -1?}
+    O -->|yes| X[Flag as outlier]
+    O -->|no| Y[Assign cluster id]
+    P --> S[Risk score and incident grouping]
+    X --> S
+```
+
+Clustering needs at least 5 logs. An outlier means the message is unusual, not that something failed.
+
+## Features
+
+| Area | Capability |
+|---|---|
+| Ingestion | Per-application API keys (stored as SHA-256 digests), severity 0-7, optional `entity_id` and `trace_id` |
+| Applications | List, inspect, rename and delete applications; scope any view with `?source=` |
+| Logs | Fetch, edit and delete single records; scoped or workspace-wide purge |
+| Storage | SQLite with WAL, 30 s busy timeout, per-workspace retention of 3, 14 or 90 days |
+| Analysis | Named repeated patterns, incident grouping, spike detection, alert rules, reversible suppression |
+| Vector space | TF-IDF neighbours and 2D SVD projection of messages |
+| Assistant | Local rule-based triage, or Groq conversational analysis when configured |
+| GitHub Actions | Import failed workflow runs and check later commits for resolution |
+
+<table>
+<tr>
+<td><img src="docs/pattern-dashboard-live.png" alt="Pattern dashboard"></td>
+<td><img src="docs/incident-workbench-live.png" alt="Incident workbench"></td>
+</tr>
+<tr>
+<td align="center">Pattern dashboard</td>
+<td align="center">Incident workbench</td>
+</tr>
+</table>
+
+## Quick start
+
+Requires Python 3.12 and Node.js.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-preview.ps1
+```
+
+The launcher installs missing dependencies and starts three background services.
+
+| Service | URL |
+|---|---|
+| Python task application | http://127.0.0.1:8000 |
+| NeuroLog dashboard | http://127.0.0.1:5173/dashboard |
+
+Create and complete a task, then open Log Explorer to see the `task-service` stream. The dashboard polls every 2 seconds and Explorer every 3. Run clustering to refresh ML analysis.
+
+The sender persists events in a SQLite outbox and retries failed delivery. An optional random generator (rate, finite limit, Stop control) tags its messages `[GENERATED]`.
+
+Keep the login-free workspace bound to localhost.
+
+## Send your first log
+
+```bash
+# 1. Create an application key (shown once)
+curl -X POST http://127.0.0.1:5001/api/generate-key \
+  -H "Content-Type: application/json" -d '{"app_name": "checkout"}'
+
+# 2. Ingest an event
+curl -X POST http://127.0.0.1:5001/api/ingest \
+  -H "x-api-key: nl_..." -H "Content-Type: application/json" \
+  -d '{"source":"checkout","message":"Payment gateway timeout","severity_level":3,"trace_id":"trc-42"}'
+```
+
+See [docs/CONNECT_APPLICATIONS.md](docs/CONNECT_APPLICATIONS.md) for integration details.
+
+## API reference
+
+All errors return JSON in the form `{"error": "..."}`. Request bodies are limited to 64 KB.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/health` | Storage liveness check |
+| POST | `/api/generate-key` | Create an application key |
+| GET | `/api/get-keys` | List keys (never returns secrets) |
+| DELETE | `/api/keys/<id>` | Revoke a key; stored logs are kept |
+| POST | `/api/ingest` | Ingest a log (`x-api-key`) |
+| GET | `/api/recent-logs?limit=&source=` | Newest logs, limit 1-1000 |
+| GET / PUT / DELETE | `/api/logs/<id>` | Read, update or delete one record |
+| DELETE | `/api/logs?source=` | Purge logs, scoped or workspace-wide |
+| GET | `/api/applications` | Applications with counts and last seen |
+| GET / PUT / DELETE | `/api/applications/<source>` | Inspect, rename or delete an application |
+| GET | `/api/stats?source=` | Totals, errors, warnings, anomalies |
+| GET | `/api/patterns` | Repeated-pattern detection |
+| GET | `/api/intelligence` | Risk scoring, incidents, spikes, alerts |
+| GET | `/api/vector-space` | TF-IDF neighbours and projection |
+| POST | `/api/run-ml` | Run TF-IDF and DBSCAN clustering |
+| GET / POST | `/api/alert-rules` | Manage alert rules (max 20) |
+| POST | `/api/suppressions` | Suppress or restore a signature |
+| GET / POST | `/api/settings` | Retention: 3, 14 or 90 days |
+| POST | `/api/chat` | Incident assistant |
+
+Severity follows syslog: 0 EMERGENCY, 1 ALERT, 2 CRITICAL, 3 ERROR, 4 WARNING, 5 NOTICE, 6 INFO, 7 DEBUG.
+
+## GitHub Actions analysis
+
+Open **GitHub Actions** in the sidebar (or `/github`), connect `owner/repository`, choose **Find failed runs**, then **Import & analyze**. Imports appear as a `github:owner/repository` application.
+
+```mermaid
+stateDiagram-v2
+    [*] --> FailedRun
+    FailedRun --> LikelyResolved: Later comparable workflow passed on a descendant commit
+    FailedRun --> StillFailing: Later workflow failed
+    FailedRun --> NotVerified: Missing evidence or access
+```
+
+| Limit | Value |
+|---|---|
+| Failed runs listed | Latest 20 |
+| Archive size | 8 MB compressed, 12 MB expanded |
+| Text files / scanned lines | 500 / 100,000 |
+| Retained lines | Up to 1,500 nonempty, errors prioritised |
+| Later-commit check | Latest 100 repository runs |
+
+Public repositories work without a token. Private repositories need a fine-grained token with **Actions: Read** (add **Contents: Read** for ancestry checks). The token lives only in page memory and is never stored. Common credential patterns are redacted, but this is not a complete secret scanner. Imports are manual and deduplicated by repository, run ID and attempt. These tags are workflow-level signals, not proof that an individual error was fixed.
+
+## Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `NEUROLOG_LOCAL_MODE` | `true` | Login-free local workspace; when `false`, Firebase bearer tokens are required |
+| `NEUROLOG_DATABASE` | `data/neurolog-live.db` | SQLite file path |
+| `CORS_ORIGINS` | `localhost:5173, 127.0.0.1:5173` | Allowed browser origins |
+| `GROQ_API_KEY` | unset | Enables conversational analysis; failures fall back to a labelled local analysis |
+| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Groq model name |
 
 ## Interface
 
-The workspace uses a compact sidebar, neutral light/dark themes, responsive panels, and restrained transitions. Choose an application to open its overview, log explorer, investigations, and assistant. The selection survives a reload in the same tab. Settings includes light, dark, and system appearance. Motion respects the operating system's reduced-motion preference.
-
-See [the design review](docs/UI_REDESIGN.md) for the Stageshow comparisons and validation notes.
+Compact sidebar, light/dark/system themes, responsive panels, and reduced-motion support. The selected application survives a reload in the same tab. See [the design review](docs/UI_REDESIGN.md).
 
 ## Validation
 
-Run `.venv/Scripts/python.exe -m pytest -q`. In `logintel_ui`, run `npm run lint` and `npm run build`.
+```bash
+python -m pytest -q              # backend
+cd logintel_ui && npm run lint && npm run build   # frontend
+```
 
-Keep the login-free workspace bound to localhost. Optional Groq configuration enables conversational analysis; otherwise the assistant summarizes actual received records. Clustering flags unusual messages for review and does not prove failure or execute remediation.
+On Windows with the project environment: `.venv/Scripts/python.exe -m pytest -q`. CI runs backend, frontend and gateway checks on every push and pull request.
 
-Original project: https://github.com/Sai-Nitin123/Neurolog-AI. Original MIT license and contributor attribution retained.
+## Documentation
 
-## Incident analysis
+| Guide | Topic |
+|---|---|
+| [USER_GUIDE.md](docs/USER_GUIDE.md) | Architecture, integration, settings, troubleshooting |
+| [CONNECT_APPLICATIONS.md](docs/CONNECT_APPLICATIONS.md) | Connecting applications |
+| [APPLICATION_WORKSPACES.md](docs/APPLICATION_WORKSPACES.md) | Per-application workspaces |
+| [INVESTIGATIONS.md](docs/INVESTIGATIONS.md) | Investigation workbench |
+| [REFERENCE_FEATURE_COMPARISON.md](docs/REFERENCE_FEATURE_COMPARISON.md) | All 37 additions; live analysis versus illustrative lab controls |
+| [RENDER_DEPLOYMENT.md](docs/RENDER_DEPLOYMENT.md) | Hosted deployment |
 
-The AI Assistant groups warnings/errors by category and source, cites record IDs, and proposes investigation steps. Enter `source:task-service` to narrow local analysis. The interface distinguishes local rule-based analysis from Groq language-model responses. Set GROQ_API_KEY in the backend environment for conversational analysis. Provider failure returns a labeled local fallback.
-
-## Investigation workbench and pipeline lab
-
-Open `/incidents` for windowed risk scoring, entity/trace history, real TF-IDF neighbors, alert rules, reversible suppression, and filtered CSV export. Open `/pipeline` for the isolated reference simulator. Read [the complete feature comparison and guide](docs/REFERENCE_FEATURE_COMPARISON.md) for all 37 additions and the distinction between live analysis and illustrative lab controls.
+The `/pipeline` page is an isolated reference simulator, separate from live analysis. A PDF version of the guide is at `output/pdf/NeuroLog_User_Guide.pdf`.
