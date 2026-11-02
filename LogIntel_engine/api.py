@@ -16,11 +16,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import DBSCAN
 try:
     from LogIntel_engine.analysis import analyze, detect_patterns, normalize_message
-    from LogIntel_engine.intelligence import investigate, stored_minute_counts, vector_space
+    from LogIntel_engine.intelligence import cluster_labels, investigate, stored_minute_counts, vector_space
     from LogIntel_engine.github_integration import register_github
 except ImportError:
     from analysis import analyze, detect_patterns, normalize_message
-    from intelligence import investigate, stored_minute_counts, vector_space
+    from intelligence import cluster_labels, investigate, stored_minute_counts, vector_space
     from github_integration import register_github
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -531,6 +531,10 @@ def create_app(config=None):
     @app.get('/api/patterns')
     def patterns():
         return jsonify(detect_patterns(recent(uid(), 300)))
+
+    @app.get('/api/cluster-labels')
+    def cluster_names():
+        return jsonify(cluster_labels(recent(uid(), 300)))
 
     @app.get('/api/intelligence')
     def intelligence():

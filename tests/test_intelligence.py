@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime, timezone, timedelta
 from LogIntel_engine.api import create_app
-from LogIntel_engine.intelligence import investigate, vector_space
+from LogIntel_engine.intelligence import cluster_labels, investigate, vector_space
 
 
 def sample(id, source='web', generated=False, entity='person', minutes=0):
@@ -130,3 +130,25 @@ def test_spike_uses_stored_counts_beyond_records_window_and_skips_github(tmp_pat
     result=client.get('/api/intelligence').json
     assert all(r['severity_level']==6 for r in result['records'])
     assert [(s['source'],s['count']) for s in result['spikes']] == [('web',8)]
+
+
+def test_cluster_labels_name_groups_by_distinctive_terms(tmp_path):
+    db=[{**sample(i),'cluster_id':0} for i in range(1,4)]
+    up=[{**sample(i),'cluster_id':1,'message':'Upstream connection refused status=502 duration_ms='+str(i)} for i in range(4,7)]
+    other=[{**sample(7),'cluster_id':-1},{**sample(8),'cluster_id':None}]
+    labels=cluster_labels(db+up+other)
+    assert set(labels) == {'0','1'}
+    assert labels['0']['records'] == 3 and set(labels['0']['terms']) >= {'database','timeout'}
+    assert 'refused' in labels['1']['terms'] and 'id' not in labels['1']['terms']
+    assert labels['0']['label'] == ' · '.join(labels['0']['terms'])
+    assert cluster_labels(other) == {}
+    assert cluster_labels([{**sample(1),'cluster_id':0,'message':'the and a'}]) == {}
+    client=create_app({'TESTING':True,'LOCAL_MODE':True,'DATABASE':str(tmp_path/'labels.db')}).test_client()
+    key=client.post('/api/generate-key',json={}).json['key']
+    for i in range(6):
+        message=('Database connection timeout duration_ms=' if i<3 else 'Upstream connection refused status=502 duration_ms=')+str(i)
+        client.post('/api/ingest',headers={'x-api-key':key},json=dict(message=message,source='web',severity_level=3))
+    assert client.get('/api/cluster-labels').json == {}
+    client.post('/api/run-ml')
+    named=client.get('/api/cluster-labels?source=web').json
+    assert len(named) == 2 and all(v['records'] == 3 for v in named.values())
