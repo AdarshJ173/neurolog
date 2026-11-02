@@ -36,8 +36,11 @@ def create_app(config=None):
 
     def db():
         if 'db' not in g:
-            g.db = sqlite3.connect(app.config['DATABASE'], timeout=10)
+            g.db = sqlite3.connect(app.config['DATABASE'], timeout=30.0, check_same_thread=False)
             g.db.row_factory = sqlite3.Row
+            g.db.execute('PRAGMA journal_mode=WAL;')
+            g.db.execute('PRAGMA synchronous=NORMAL;')
+            g.db.execute('PRAGMA busy_timeout=30000;')
         return g.db
 
     @app.teardown_appcontext
