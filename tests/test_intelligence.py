@@ -110,3 +110,23 @@ def test_spike_needs_baseline_and_keeps_generated_separate():
     result=investigate(burst(1,8,generated=True)+quiet)
     assert [s['generated'] for s in result['spikes']] == [True]
     assert not any(r['spike'] for r in result['records'] if not r['generated'])
+
+
+def test_spike_uses_stored_counts_beyond_records_window_and_skips_github(tmp_path):
+    config={'TESTING':True,'LOCAL_MODE':True,'DATABASE':str(tmp_path/'spike.db')}
+    client=create_app(config).test_client()
+    key=client.post('/api/generate-key',json={}).json['key']
+    client.post('/api/ingest',headers={'x-api-key':key},json=dict(message='start',source='web'))
+    minute=(datetime.now(timezone.utc)-timedelta(minutes=2)).replace(second=0,microsecond=0)
+    rows=[]
+    for source in ('web','github:owner/repo'):
+        rows+=[(source,(datetime.now(timezone.utc)-timedelta(minutes=m)).isoformat(),4,'WARNING','Slow query') for m in range(6,21)]
+        rows+=[(source,(minute+timedelta(seconds=5*i)).isoformat(),3,'ERROR','Database connection timeout') for i in range(8)]
+    rows+=[('web',datetime.now(timezone.utc).isoformat(),6,'INFO','Request completed') for _ in range(400)]
+    with sqlite3.connect(config['DATABASE']) as db:
+        db.execute('UPDATE logs SET timestamp=? WHERE message=?',((datetime.now(timezone.utc)-timedelta(minutes=30)).isoformat(),'start'))
+        db.executemany("INSERT INTO logs(uid,timestamp,source,severity_level,severity_label,message) VALUES('local-workspace',?,?,?,?,?)",
+                       [(t,s,l,label,m) for s,t,l,label,m in rows])
+    result=client.get('/api/intelligence').json
+    assert all(r['severity_level']==6 for r in result['records'])
+    assert [(s['source'],s['count']) for s in result['spikes']] == [('web',8)]
