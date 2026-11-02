@@ -58,6 +58,7 @@ def create_app(config=None):
                 ml_anomaly INTEGER DEFAULT 0, cluster_id INTEGER DEFAULT NULL);
             CREATE INDEX IF NOT EXISTS logs_owner_time ON logs(uid, timestamp);
             CREATE INDEX IF NOT EXISTS logs_owner_source ON logs(uid, source);
+            CREATE INDEX IF NOT EXISTS logs_owner_level ON logs(uid, severity_level);
             CREATE TABLE IF NOT EXISTS keys (
                 id INTEGER PRIMARY KEY, uid TEXT NOT NULL, name TEXT NOT NULL,
                 digest TEXT UNIQUE NOT NULL, created_at TEXT NOT NULL, suffix TEXT NOT NULL);
@@ -111,16 +112,49 @@ def create_app(config=None):
         except Exception:
             raise Unauthorized('Invalid or expired sign-in token.')
 
-    def recent(owner, limit=100):
+    def clean_retention(owner):
         settings = db().execute('SELECT retention FROM settings WHERE uid=?', (owner,)).fetchone()
         cutoff = (datetime.now(timezone.utc) - timedelta(days=settings['retention'] if settings else 14)).isoformat()
         db().execute('DELETE FROM logs WHERE uid=? AND timestamp<?', (owner, cutoff))
         db().commit()
-        source = scope()
-        query = 'SELECT * FROM logs WHERE uid=?' + (' AND source=?' if source else '') + ' ORDER BY timestamp DESC, _id DESC LIMIT ?'
-        values = (owner, source, limit) if source else (owner, limit)
-        return [dict(row) for row in db().execute(query, values)]
 
+    def recent(owner, limit=100, before_id=None, after_id=None, since=None, until=None, min_level=None, max_level=None, query=None):
+        clean_retention(owner)
+        source = scope()
+        conditions = ['uid=?']
+        params = [owner]
+        if source:
+            conditions.append('source=?')
+            params.append(source)
+        if before_id is not None:
+            conditions.append('_id < ?')
+            params.append(before_id)
+        if after_id is not None:
+            conditions.append('_id > ?')
+            params.append(after_id)
+        if since is not None:
+            conditions.append('timestamp >= ?')
+            params.append(since)
+        if until is not None:
+            conditions.append('timestamp <= ?')
+            params.append(until)
+        if min_level is not None:
+            conditions.append('severity_level >= ?')
+            params.append(min_level)
+        if max_level is not None:
+            conditions.append('severity_level <= ?')
+            params.append(max_level)
+        if query:
+            conditions.append('message LIKE ?')
+            params.append(f'%{query}%')
+        where_clause = ' AND '.join(conditions)
+        order = 'ASC' if after_id is not None and before_id is None else 'DESC'
+        sql = f'SELECT * FROM logs WHERE {where_clause} ORDER BY timestamp {order}, _id {order} LIMIT ?'
+        params.append(limit)
+        rows = [dict(row) for row in db().execute(sql, params)]
+        if order == 'ASC':
+            rows.reverse()
+        return rows
     def insert_log(owner, data):
         message = text_field(data, 'message')
         source = text_field(data, 'source', 'external-app', 120)
@@ -244,9 +278,41 @@ def create_app(config=None):
         owner = db().execute('SELECT uid FROM keys WHERE digest=?', (hashlib.sha256(key.encode()).hexdigest(),)).fetchone()
         if not key or not owner:
             return jsonify(error='Invalid or missing API key.'), 401
-        insert_log(owner['uid'], body())
-        return jsonify(status='success'), 201
-
+        payload = request.get_json(silent=True)
+        if isinstance(payload, list):
+            if not payload:
+                raise ValueError('Batch payload must contain at least 1 log entry.')
+            if len(payload) > 500:
+                raise ValueError('Batch payload cannot exceed 500 entries per request.')
+            labels = ['EMERGENCY', 'ALERT', 'CRITICAL', 'ERROR', 'WARNING', 'NOTICE', 'INFO', 'DEBUG']
+            current_time = now()
+            records = []
+            for item in payload:
+                if not isinstance(item, dict):
+                    raise ValueError('Each batch item must be a JSON object.')
+                message = text_field(item, 'message')
+                source = text_field(item, 'source', 'external-app', 120)
+                level = item.get('severity_level', 6)
+                if type(level) is not int or not 0 <= level <= 7:
+                    raise ValueError('severity_level must be an integer from 0 to 7 (syslog).')
+                entity = item.get('entity_id')
+                if entity is not None and (not isinstance(entity, str) or len(entity) > 120):
+                    raise ValueError('entity_id must be text, at most 120 characters.')
+                trace = item.get('trace_id')
+                if trace is not None and (not isinstance(trace, str) or len(trace) > 120):
+                    raise ValueError('trace_id must be text, at most 120 characters.')
+                records.append((owner['uid'], current_time, source, level, labels[level], message, entity, trace))
+            db().executemany(
+                'INSERT INTO logs(uid,timestamp,source,severity_level,severity_label,message,entity_id,trace_id) VALUES(?,?,?,?,?,?,?,?)',
+                records
+            )
+            db().commit()
+            return jsonify(status='success', ingested=len(records)), 201
+        elif isinstance(payload, dict):
+            insert_log(owner['uid'], payload)
+            return jsonify(status='success'), 201
+        else:
+            raise ValueError('Send a JSON object or array of log entries.')
     @app.get('/api/recent-logs')
     def logs():
         owner = uid()
@@ -256,7 +322,38 @@ def create_app(config=None):
             raise ValueError('limit must be an integer from 1 to 1000.')
         if not 1 <= limit <= 1000:
             raise ValueError('limit must be an integer from 1 to 1000.')
-        return jsonify(recent(owner, limit))
+        before_id = request.args.get('before_id')
+        if before_id is not None:
+            try:
+                before_id = int(before_id)
+            except ValueError:
+                raise ValueError('before_id must be an integer.')
+        after_id = request.args.get('after_id')
+        if after_id is not None:
+            try:
+                after_id = int(after_id)
+            except ValueError:
+                raise ValueError('after_id must be an integer.')
+        since = request.args.get('since')
+        until = request.args.get('until')
+        min_level = request.args.get('min_level')
+        if min_level is not None:
+            try:
+                min_level = int(min_level)
+                if not 0 <= min_level <= 7:
+                    raise ValueError()
+            except ValueError:
+                raise ValueError('min_level must be an integer from 0 to 7.')
+        max_level = request.args.get('max_level')
+        if max_level is not None:
+            try:
+                max_level = int(max_level)
+                if not 0 <= max_level <= 7:
+                    raise ValueError()
+            except ValueError:
+                raise ValueError('max_level must be an integer from 0 to 7.')
+        search_q = request.args.get('q', '').strip() or None
+        return jsonify(recent(owner, limit=limit, before_id=before_id, after_id=after_id, since=since, until=until, min_level=min_level, max_level=max_level, query=search_q))
 
     @app.get('/api/logs/<int:log_id>')
     def get_single_log(log_id):
