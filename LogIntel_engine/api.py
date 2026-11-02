@@ -14,11 +14,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import DBSCAN
 try:
     from LogIntel_engine.analysis import analyze, detect_patterns, normalize_message
-    from LogIntel_engine.intelligence import investigate, vector_space
+    from LogIntel_engine.intelligence import investigate, stored_minute_counts, vector_space
     from LogIntel_engine.github_integration import register_github
 except ImportError:
     from analysis import analyze, detect_patterns, normalize_message
-    from intelligence import investigate, vector_space
+    from intelligence import investigate, stored_minute_counts, vector_space
     from github_integration import register_github
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -417,9 +417,18 @@ def create_app(config=None):
     @app.get('/api/intelligence')
     def intelligence():
         owner = uid()
-        return jsonify(investigate(recent(owner, 300),
+        records = recent(owner, 300)
+        source = scope()
+        where = 'uid=?' + (' AND source=?' if source else '')
+        values = (owner, source) if source else (owner,)
+        since = (datetime.now(timezone.utc) - timedelta(minutes=40)).isoformat()
+        rows = db().execute("SELECT source, message LIKE '[GENERATED]%', substr(timestamp,1,16), COUNT(*) FROM logs WHERE "
+                            + where + ' AND severity_level<=4 AND timestamp>=? GROUP BY 1,2,3', (*values, since)).fetchall()
+        oldest = db().execute('SELECT MIN(timestamp) FROM logs WHERE ' + where, values).fetchone()[0]
+        return jsonify(investigate(records,
             [r['signature'] for r in db().execute('SELECT signature FROM suppressions WHERE uid=?', (owner,))],
-            [dict(r) for r in db().execute('SELECT id,condition,action FROM alert_rules WHERE uid=? AND source=?', (owner, scope()))]))
+            [dict(r) for r in db().execute('SELECT id,condition,action FROM alert_rules WHERE uid=? AND source=?', (owner, scope()))],
+            minute_counts=stored_minute_counts(map(tuple, rows)), observed_since=oldest))
 
     @app.get('/api/vector-space')
     def vectors():
