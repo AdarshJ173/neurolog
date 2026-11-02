@@ -4,7 +4,8 @@ from datetime import datetime, timezone, timedelta
 import hashlib
 import statistics
 import time
-from sklearn.feature_extraction.text import TfidfVectorizer
+import numpy as np
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
 try:
@@ -162,6 +163,31 @@ def investigate(records, suppressed=(), rules=(), window_minutes=5, minute_count
                      suppressed=sum(r['suppressed'] for r in enriched), spikes=len(spikes),
                      analysis_ms=round((time.perf_counter()-started)*1000,2)),
         window_minutes=window_minutes, method='Transparent severity + recurrence + volume spike + outlier heuristic; not XGBoost')
+
+
+def cluster_labels(records, top_terms=3):
+    """Name each stored DBSCAN cluster by its highest mean TF-IDF terms instead of a bare number.
+
+    IDF is fitted across all clustered records, so words shared by every group rank low and
+    each label favours what sets its group apart. Outliers (-1) and unanalysed records are skipped.
+    """
+    clustered = [r for r in records if r.get('cluster_id') is not None and r['cluster_id'] >= 0]
+    if not clustered:
+        return {}
+    try:
+        vectorizer = TfidfVectorizer(stop_words=list(ENGLISH_STOP_WORDS | {'id'}), max_features=1500)
+        matrix = vectorizer.fit_transform([normalize_message(r['message']) for r in clustered])
+    except ValueError:
+        return {}
+    features = vectorizer.get_feature_names_out()
+    labels = {}
+    for cluster in sorted({r['cluster_id'] for r in clustered}):
+        rows = [i for i, r in enumerate(clustered) if r['cluster_id'] == cluster]
+        weights = np.asarray(matrix[rows].mean(axis=0)).ravel()
+        order = sorted((i for i in range(len(features)) if weights[i] > 0), key=lambda i: (-weights[i], features[i]))
+        terms = [str(features[i]) for i in order[:top_terms]]
+        labels[str(cluster)] = dict(label=' · '.join(terms) or f'Message group {cluster}', terms=terms, records=len(rows))
+    return labels
 
 
 def vector_space(records, selected_id=None):
