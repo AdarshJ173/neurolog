@@ -4,7 +4,7 @@ let applicationSource='';
 try{applicationSource=sessionStorage.getItem('neurolog-application')||'';}catch{/* storage unavailable */}
 export function selectApplication(source){applicationSource=source;try{sessionStorage.setItem('neurolog-application',source);}catch{/* storage unavailable */}}
 export function selectedApplication(){return applicationSource;}
-const scopedPaths=['/recent-logs','/patterns','/intelligence','/vector-space','/run-ml','/chat','/alert-rules'];
+const scopedPaths=['/recent-logs','/patterns','/cluster-labels','/intelligence','/vector-space','/run-ml','/chat','/alert-rules'];
 api.interceptors.request.use(config=>{if(applicationSource&&scopedPaths.some(p=>config.url.split('?')[0]===p||config.url.startsWith(p+'/'))){config.params={...config.params,source:applicationSource};}return config;});
 api.interceptors.response.use(response => response, error => {
   window.dispatchEvent(new CustomEvent('neurolog-error', {
