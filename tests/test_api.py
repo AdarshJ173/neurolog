@@ -202,3 +202,44 @@ def test_application_and_log_crud_operations(app):
     purge_res = client.delete('/api/logs?source=order-svc')
     assert purge_res.status_code == 200
     assert client.get('/api/recent-logs?source=order-svc').json == []
+
+
+def test_batch_ingest_and_query_filtering(app):
+    client = app.test_client()
+    key = client.post('/api/generate-key', json={}).json['key']
+    headers = {'x-api-key': key}
+
+    # Batch ingest validation
+    assert client.post('/api/ingest', headers=headers, json=[]).status_code == 400
+    batch_payload = [
+        {'source': 'payment-gw', 'message': f'Transaction item {i}', 'severity_level': 3 if i % 2 == 0 else 6}
+        for i in range(10)
+    ]
+    batch_res = client.post('/api/ingest', headers=headers, json=batch_payload)
+    assert batch_res.status_code == 201
+    assert batch_res.json['ingested'] == 10
+
+    # Keyset pagination & filtering
+    all_logs = client.get('/api/recent-logs?source=payment-gw&limit=10').json
+    assert len(all_logs) == 10
+    mid_id = all_logs[4]['_id']
+
+    older = client.get(f'/api/recent-logs?source=payment-gw&before_id={mid_id}').json
+    assert all(r['_id'] < mid_id for r in older)
+
+    newer = client.get(f'/api/recent-logs?source=payment-gw&after_id={mid_id}').json
+    assert all(r['_id'] > mid_id for r in newer)
+
+    # Severity filtering
+    errors_only = client.get('/api/recent-logs?source=payment-gw&max_level=3').json
+    assert len(errors_only) == 5
+    assert all(r['severity_level'] <= 3 for r in errors_only)
+
+    info_only = client.get('/api/recent-logs?source=payment-gw&min_level=6').json
+    assert len(info_only) == 5
+    assert all(r['severity_level'] >= 6 for r in info_only)
+
+    # Substring search
+    search_res = client.get('/api/recent-logs?source=payment-gw&q=item 3').json
+    assert len(search_res) == 1
+    assert search_res[0]['message'] == 'Transaction item 3'
