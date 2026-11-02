@@ -143,3 +143,62 @@ def test_application_scoping_happens_before_limit_and_analysis(app):
     client.post('/api/alert-rules?source=guest-connect', json={'condition': 'database_error', 'action': 'in_app'})
     assert len(client.get('/api/alert-rules?source=guest-connect').json) == 1
     assert client.get('/api/alert-rules?source=task-service').json == []
+
+
+def test_application_and_log_crud_operations(app):
+    client = app.test_client()
+    key = client.post('/api/generate-key', json={}).json['key']
+    headers = {'x-api-key': key}
+
+    # Create logs
+    client.post('/api/ingest', headers=headers, json={'source': 'order-svc', 'message': 'Order placed', 'severity_level': 6, 'entity_id': 'ord-123'})
+    client.post('/api/ingest', headers=headers, json={'source': 'order-svc', 'message': 'Payment failed', 'severity_level': 3, 'trace_id': 'trc-abc'})
+    client.post('/api/ingest', headers=headers, json={'source': 'auth-svc', 'message': 'User logged in', 'severity_level': 6})
+
+    # Applications list
+    apps = client.get('/api/applications').json
+    sources = [a['source'] for a in apps]
+    assert 'order-svc' in sources and 'auth-svc' in sources
+
+    # Stats endpoint
+    stats = client.get('/api/stats').json
+    assert stats['total_logs'] == 3
+    assert stats['errors'] == 1
+    assert stats['active_sources'] == 2
+
+    scoped_stats = client.get('/api/stats?source=order-svc').json
+    assert scoped_stats['total_logs'] == 2
+    assert scoped_stats['errors'] == 1
+
+    # Log single record CRUD
+    logs = client.get('/api/recent-logs?source=order-svc').json
+    log_id = logs[0]['_id']
+    fetched = client.get(f'/api/logs/{log_id}').json
+    assert fetched['_id'] == log_id
+
+    # Update single log
+    updated = client.put(f'/api/logs/{log_id}', json={'message': 'Payment failed due to gateway timeout', 'severity_level': 2}).json
+    assert updated['message'] == 'Payment failed due to gateway timeout'
+    assert updated['severity_level'] == 2
+    assert updated['severity_label'] == 'CRITICAL'
+
+    # Rename application
+    rename_res = client.put('/api/applications/auth-svc', json={'new_source': 'iam-svc'}).json
+    assert rename_res['renamed_records'] == 1
+    assert client.get('/api/applications/auth-svc').status_code == 404
+    assert any(a['source'] == 'iam-svc' for a in client.get('/api/applications').json)
+
+    # Delete single log
+    del_res = client.delete(f'/api/logs/{log_id}')
+    assert del_res.status_code == 200
+    assert client.get(f'/api/logs/{log_id}').status_code == 404
+
+    # Delete application and its logs
+    app_del_res = client.delete('/api/applications/iam-svc')
+    assert app_del_res.status_code == 200
+    assert all(a['source'] != 'iam-svc' for a in client.get('/api/applications').json)
+
+    # Scoped purge
+    purge_res = client.delete('/api/logs?source=order-svc')
+    assert purge_res.status_code == 200
+    assert client.get('/api/recent-logs?source=order-svc').json == []
