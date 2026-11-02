@@ -243,3 +243,43 @@ def test_batch_ingest_and_query_filtering(app):
     search_res = client.get('/api/recent-logs?source=payment-gw&q=item 3').json
     assert len(search_res) == 1
     assert search_res[0]['message'] == 'Transaction item 3'
+
+
+def test_bulk_operations_and_streaming_export(app):
+    client = app.test_client()
+    key = client.post('/api/generate-key', json={}).json['key']
+    headers = {'x-api-key': key}
+
+    # Ingest logs
+    records = [{'source': 'order-api', 'message': f'Log event {i}', 'severity_level': 3 if i < 3 else 6} for i in range(6)]
+    client.post('/api/ingest', headers=headers, json=records)
+    logs = client.get('/api/recent-logs?source=order-api&limit=6').json
+    ids = [r['_id'] for r in logs]
+
+    # Bulk update
+    update_res = client.post('/api/logs/bulk-update', json={'ids': ids[:2], 'updates': {'severity_level': 1, 'source': 'order-core'}})
+    assert update_res.status_code == 200
+    assert update_res.json['updated_count'] == 2
+
+    updated_check = client.get('/api/recent-logs?source=order-core').json
+    assert len(updated_check) == 2
+    assert all(r['severity_level'] == 1 and r['severity_label'] == 'ALERT' for r in updated_check)
+
+    # Bulk delete
+    del_res = client.post('/api/logs/bulk-delete', json={'ids': ids[:2]})
+    assert del_res.status_code == 200
+    assert del_res.json['deleted_count'] == 2
+    assert len(client.get('/api/recent-logs?source=order-core').json) == 0
+
+    # Streaming export JSONL
+    export_jsonl = client.get('/api/logs/export?format=jsonl&source=order-api')
+    assert export_jsonl.status_code == 200
+    lines = export_jsonl.data.decode('utf-8').strip().split('\n')
+    assert len(lines) == 4
+
+    # Streaming export CSV
+    export_csv = client.get('/api/logs/export?format=csv&source=order-api')
+    assert export_csv.status_code == 200
+    csv_lines = export_csv.data.decode('utf-8').strip().split('\r\n' if '\r\n' in export_csv.data.decode('utf-8') else '\n')
+    assert csv_lines[0].startswith('id,timestamp,source')
+    assert len(csv_lines) == 5  # header + 4 rows

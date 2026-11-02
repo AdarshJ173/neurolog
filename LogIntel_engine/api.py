@@ -7,7 +7,9 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request, g, Response, stream_with_context
+import csv
+import io
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException, Unauthorized
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -410,6 +412,122 @@ def create_app(config=None):
         db().commit()
         updated = db().execute('SELECT * FROM logs WHERE _id=? AND uid=?', (log_id, owner)).fetchone()
         return jsonify(dict(updated))
+    @app.post('/api/logs/bulk-delete')
+    def bulk_delete_logs():
+        owner = uid()
+        data = body()
+        ids = data.get('ids')
+        if not isinstance(ids, list) or not ids or len(ids) > 1000:
+            raise ValueError('ids must be a non-empty list of at most 1000 log record IDs.')
+        for item in ids:
+            if type(item) is not int or item <= 0:
+                raise ValueError('Each log record ID must be a positive integer.')
+        placeholders = ', '.join(['?'] * len(ids))
+        query = f'DELETE FROM logs WHERE uid=? AND _id IN ({placeholders})'
+        res = db().execute(query, [owner, *ids])
+        db().commit()
+        return jsonify(status='Bulk delete completed.', deleted_count=res.rowcount)
+
+    @app.post('/api/logs/bulk-update')
+    def bulk_update_logs():
+        owner = uid()
+        data = body()
+        ids = data.get('ids')
+        if not isinstance(ids, list) or not ids or len(ids) > 1000:
+            raise ValueError('ids must be a non-empty list of at most 1000 log record IDs.')
+        for item in ids:
+            if type(item) is not int or item <= 0:
+                raise ValueError('Each log record ID must be a positive integer.')
+        updates = data.get('updates')
+        if not isinstance(updates, dict) or not updates:
+            raise ValueError('updates must be a JSON object with fields to update.')
+        fields = []
+        values = []
+        if 'severity_level' in updates:
+            level = updates['severity_level']
+            if type(level) is not int or not 0 <= level <= 7:
+                raise ValueError('severity_level must be an integer from 0 to 7.')
+            labels = ['EMERGENCY', 'ALERT', 'CRITICAL', 'ERROR', 'WARNING', 'NOTICE', 'INFO', 'DEBUG']
+            fields.append('severity_level=?')
+            values.append(level)
+            fields.append('severity_label=?')
+            values.append(labels[level])
+        if 'source' in updates:
+            fields.append('source=?')
+            values.append(text_field(updates, 'source', maximum=120))
+        if not fields:
+            raise ValueError('No supported fields provided to bulk update.')
+        placeholders = ', '.join(['?'] * len(ids))
+        query = f'UPDATE logs SET {", ".join(fields)} WHERE uid=? AND _id IN ({placeholders})'
+        res = db().execute(query, [*values, owner, *ids])
+        db().commit()
+        return jsonify(status='Bulk update completed.', updated_count=res.rowcount)
+
+    @app.get('/api/logs/export')
+    def export_logs():
+        owner = uid()
+        fmt = request.args.get('format', 'jsonl').lower().strip()
+        if fmt not in ('jsonl', 'csv'):
+            raise ValueError('format must be either jsonl or csv.')
+        source = scope()
+        min_level = request.args.get('min_level')
+        max_level = request.args.get('max_level')
+        conditions = ['uid=?']
+        params = [owner]
+        if source:
+            conditions.append('source=?')
+            params.append(source)
+        if min_level is not None:
+            try:
+                min_level = int(min_level)
+                conditions.append('severity_level >= ?')
+                params.append(min_level)
+            except ValueError:
+                raise ValueError('min_level must be an integer from 0 to 7.')
+        if max_level is not None:
+            try:
+                max_level = int(max_level)
+                conditions.append('severity_level <= ?')
+                params.append(max_level)
+            except ValueError:
+                raise ValueError('max_level must be an integer from 0 to 7.')
+        sql = f'SELECT _id, timestamp, source, severity_level, severity_label, message, entity_id, trace_id, ml_anomaly FROM logs WHERE {" AND ".join(conditions)} ORDER BY timestamp ASC, _id ASC'
+        db_path = app.config['DATABASE']
+
+        def generate():
+            conn = sqlite3.connect(db_path, timeout=30.0)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            if fmt == 'csv':
+                out = io.StringIO()
+                writer = csv.writer(out)
+                writer.writerow(['id', 'timestamp', 'source', 'severity_level', 'severity_label', 'message', 'entity_id', 'trace_id', 'ml_anomaly'])
+                yield out.getvalue()
+                out.seek(0)
+                out.truncate(0)
+                while True:
+                    batch = cursor.fetchmany(100)
+                    if not batch:
+                        break
+                    for row in batch:
+                        writer.writerow([row['_id'], row['timestamp'], row['source'], row['severity_level'], row['severity_label'], row['message'], row['entity_id'] or '', row['trace_id'] or '', row['ml_anomaly']])
+                    yield out.getvalue()
+                    out.seek(0)
+                    out.truncate(0)
+            else:
+                while True:
+                    batch = cursor.fetchmany(100)
+                    if not batch:
+                        break
+                    for row in batch:
+                        yield json.dumps(dict(row)) + '\n'
+            conn.close()
+
+        content_type = 'text/csv; charset=utf-8' if fmt == 'csv' else 'application/x-ndjson; charset=utf-8'
+        filename = f'neurolog-export-{datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")}.{fmt}'
+        return Response(stream_with_context(generate()), mimetype=content_type, headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
     @app.get('/api/patterns')
     def patterns():
         return jsonify(detect_patterns(recent(uid(), 300)))
