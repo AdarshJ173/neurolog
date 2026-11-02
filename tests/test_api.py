@@ -143,3 +143,103 @@ def test_application_scoping_happens_before_limit_and_analysis(app):
     client.post('/api/alert-rules?source=guest-connect', json={'condition': 'database_error', 'action': 'in_app'})
     assert len(client.get('/api/alert-rules?source=guest-connect').json) == 1
     assert client.get('/api/alert-rules?source=task-service').json == []
+
+
+def test_application_and_log_crud_operations(app):
+    client = app.test_client()
+    key = client.post('/api/generate-key', json={}).json['key']
+    headers = {'x-api-key': key}
+
+    # Create logs
+    client.post('/api/ingest', headers=headers, json={'source': 'order-svc', 'message': 'Order placed', 'severity_level': 6, 'entity_id': 'ord-123'})
+    client.post('/api/ingest', headers=headers, json={'source': 'order-svc', 'message': 'Payment failed', 'severity_level': 3, 'trace_id': 'trc-abc'})
+    client.post('/api/ingest', headers=headers, json={'source': 'auth-svc', 'message': 'User logged in', 'severity_level': 6})
+
+    # Applications list
+    apps = client.get('/api/applications').json
+    sources = [a['source'] for a in apps]
+    assert 'order-svc' in sources and 'auth-svc' in sources
+
+    # Stats endpoint
+    stats = client.get('/api/stats').json
+    assert stats['total_logs'] == 3
+    assert stats['errors'] == 1
+    assert stats['active_sources'] == 2
+
+    scoped_stats = client.get('/api/stats?source=order-svc').json
+    assert scoped_stats['total_logs'] == 2
+    assert scoped_stats['errors'] == 1
+
+    # Log single record CRUD
+    logs = client.get('/api/recent-logs?source=order-svc').json
+    log_id = logs[0]['_id']
+    fetched = client.get(f'/api/logs/{log_id}').json
+    assert fetched['_id'] == log_id
+
+    # Update single log
+    updated = client.put(f'/api/logs/{log_id}', json={'message': 'Payment failed due to gateway timeout', 'severity_level': 2}).json
+    assert updated['message'] == 'Payment failed due to gateway timeout'
+    assert updated['severity_level'] == 2
+    assert updated['severity_label'] == 'CRITICAL'
+
+    # Rename application
+    rename_res = client.put('/api/applications/auth-svc', json={'new_source': 'iam-svc'}).json
+    assert rename_res['renamed_records'] == 1
+    assert client.get('/api/applications/auth-svc').status_code == 404
+    assert any(a['source'] == 'iam-svc' for a in client.get('/api/applications').json)
+
+    # Delete single log
+    del_res = client.delete(f'/api/logs/{log_id}')
+    assert del_res.status_code == 200
+    assert client.get(f'/api/logs/{log_id}').status_code == 404
+
+    # Delete application and its logs
+    app_del_res = client.delete('/api/applications/iam-svc')
+    assert app_del_res.status_code == 200
+    assert all(a['source'] != 'iam-svc' for a in client.get('/api/applications').json)
+
+    # Scoped purge
+    purge_res = client.delete('/api/logs?source=order-svc')
+    assert purge_res.status_code == 200
+    assert client.get('/api/recent-logs?source=order-svc').json == []
+
+
+def test_batch_ingest_and_query_filtering(app):
+    client = app.test_client()
+    key = client.post('/api/generate-key', json={}).json['key']
+    headers = {'x-api-key': key}
+
+    # Batch ingest validation
+    assert client.post('/api/ingest', headers=headers, json=[]).status_code == 400
+    batch_payload = [
+        {'source': 'payment-gw', 'message': f'Transaction item {i}', 'severity_level': 3 if i % 2 == 0 else 6}
+        for i in range(10)
+    ]
+    batch_res = client.post('/api/ingest', headers=headers, json=batch_payload)
+    assert batch_res.status_code == 201
+    assert batch_res.json['ingested'] == 10
+
+    # Keyset pagination & filtering
+    all_logs = client.get('/api/recent-logs?source=payment-gw&limit=10').json
+    assert len(all_logs) == 10
+    mid_id = all_logs[4]['_id']
+
+    older = client.get(f'/api/recent-logs?source=payment-gw&before_id={mid_id}').json
+    assert all(r['_id'] < mid_id for r in older)
+
+    newer = client.get(f'/api/recent-logs?source=payment-gw&after_id={mid_id}').json
+    assert all(r['_id'] > mid_id for r in newer)
+
+    # Severity filtering
+    errors_only = client.get('/api/recent-logs?source=payment-gw&max_level=3').json
+    assert len(errors_only) == 5
+    assert all(r['severity_level'] <= 3 for r in errors_only)
+
+    info_only = client.get('/api/recent-logs?source=payment-gw&min_level=6').json
+    assert len(info_only) == 5
+    assert all(r['severity_level'] >= 6 for r in info_only)
+
+    # Substring search
+    search_res = client.get('/api/recent-logs?source=payment-gw&q=item 3').json
+    assert len(search_res) == 1
+    assert search_res[0]['message'] == 'Transaction item 3'
